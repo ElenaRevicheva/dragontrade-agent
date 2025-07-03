@@ -1,0 +1,11 @@
+echo "node_modules/
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.log
+.DS_Store
+secrets.json
+character-with-secrets.json" > .gitignore
+node_modules

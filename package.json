@@ -1,0 +1,21 @@
+{
+  "name": "dragontrade-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DragonTrade Web3 Trading Assistant",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@elizaos/core": "^0.1.7",
+    "@elizaos/plugin-web-search": "^0.1.7",
+    "@elizaos/plugin-coinmarketcap": "^0.1.7",
+    "@elizaos/plugin-twitter": "^0.1.7",
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
