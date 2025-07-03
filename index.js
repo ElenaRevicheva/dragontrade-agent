@@ -41,31 +41,141 @@ async function main() {
     console.log(`Character loaded: ${character.name}`);
     console.log(`Clients: ${character.clients?.join(', ')}`);
     
-    // Create database adapter
+    // Create database adapter - Try different types
     console.log('\n🗄️ Creating database adapter...');
     let databaseAdapter;
     
-    // Try each adapter type
-    if (elizaCore.MemoryCacheAdapter) {
-      try {
-        databaseAdapter = new elizaCore.MemoryCacheAdapter();
-        console.log('✅ MemoryCacheAdapter created');
-      } catch (err) {
-        console.log('❌ MemoryCacheAdapter failed:', err.message);
+    // Check available database adapters
+    console.log('Available adapters:', {
+      DatabaseAdapter: !!elizaCore.DatabaseAdapter,
+      DbCacheAdapter: !!elizaCore.DbCacheAdapter,
+      MemoryCacheAdapter: !!elizaCore.MemoryCacheAdapter,
+      FsCacheAdapter: !!elizaCore.FsCacheAdapter
+    });
+    
+    // Try creating a proper database adapter
+    try {
+      // Option 1: Try extending DatabaseAdapter
+      if (elizaCore.DatabaseAdapter) {
+        console.log('🔄 Trying DatabaseAdapter...');
+        
+        // Create a simple in-memory implementation
+        class SimpleMemoryAdapter extends elizaCore.DatabaseAdapter {
+          constructor() {
+            super();
+            this.memories = new Map();
+            this.relationships = new Map();
+            this.goals = new Map();
+            this.rooms = new Map();
+            this.participants = new Map();
+          }
+          
+          // Required memory methods
+          async getMemoryById(id) {
+            return this.memories.get(id) || null;
+          }
+          
+          async getMemories(params) {
+            return Array.from(this.memories.values());
+          }
+          
+          async createMemory(memory) {
+            const id = memory.id || Date.now().toString();
+            this.memories.set(id, { ...memory, id });
+            return { ...memory, id };
+          }
+          
+          async removeMemory(id) {
+            return this.memories.delete(id);
+          }
+          
+          // Required relationship methods
+          async getRelationships(params) {
+            return Array.from(this.relationships.values());
+          }
+          
+          async createRelationship(relationship) {
+            const id = relationship.id || Date.now().toString();
+            this.relationships.set(id, { ...relationship, id });
+            return { ...relationship, id };
+          }
+          
+          // Required goal methods
+          async getGoals(params) {
+            return Array.from(this.goals.values());
+          }
+          
+          async createGoal(goal) {
+            const id = goal.id || Date.now().toString();
+            this.goals.set(id, { ...goal, id });
+            return { ...goal, id };
+          }
+          
+          async updateGoal(goal) {
+            this.goals.set(goal.id, goal);
+            return goal;
+          }
+          
+          async removeGoal(id) {
+            return this.goals.delete(id);
+          }
+          
+          // Required room methods
+          async getRoom(id) {
+            return this.rooms.get(id) || null;
+          }
+          
+          async createRoom(room) {
+            const id = room.id || Date.now().toString();
+            this.rooms.set(id, { ...room, id });
+            return { ...room, id };
+          }
+          
+          // Required participant methods
+          async getParticipantsForAccount(userId) {
+            return Array.from(this.participants.values()).filter(p => p.userId === userId);
+          }
+          
+          async getParticipantUserState(roomId, userId) {
+            return this.participants.get(`${roomId}-${userId}`) || null;
+          }
+          
+          async setParticipantUserState(roomId, userId, state) {
+            this.participants.set(`${roomId}-${userId}`, { roomId, userId, ...state });
+            return { roomId, userId, ...state };
+          }
+          
+          // Cache methods for compatibility
+          async getCachedEmbeddings(text) {
+            return null;
+          }
+          
+          async setCachedEmbeddings(text, embeddings) {
+            return true;
+          }
+        }
+        
+        databaseAdapter = new SimpleMemoryAdapter();
+        console.log('✅ Custom DatabaseAdapter created');
       }
+    } catch (err) {
+      console.log('❌ DatabaseAdapter creation failed:', err.message);
     }
     
-    if (!databaseAdapter && elizaCore.FsCacheAdapter) {
+    // Fallback: Try other adapters
+    if (!databaseAdapter) {
       try {
-        databaseAdapter = new elizaCore.FsCacheAdapter();
-        console.log('✅ FsCacheAdapter created');
+        if (elizaCore.DbCacheAdapter) {
+          databaseAdapter = new elizaCore.DbCacheAdapter();
+          console.log('✅ DbCacheAdapter created');
+        }
       } catch (err) {
-        console.log('❌ FsCacheAdapter failed:', err.message);
+        console.log('❌ DbCacheAdapter failed:', err.message);
       }
     }
     
     if (!databaseAdapter) {
-      throw new Error('Could not create any database adapter');
+      throw new Error('Could not create any compatible database adapter');
     }
     
     // Prepare plugins
@@ -99,56 +209,38 @@ async function main() {
     
     console.log(`Total plugins loaded: ${plugins.length}`);
     
-    // Create minimal runtime config
+    // Create runtime config
     const runtimeConfig = {
       character: character,
       modelProvider: 'openai',
+      token: process.env.OPENAI_API_KEY,
       databaseAdapter: databaseAdapter,
       plugins: plugins
     };
-    
-    // Add token only if available
-    if (process.env.OPENAI_API_KEY) {
-      runtimeConfig.token = process.env.OPENAI_API_KEY;
-    }
     
     console.log('\n🤖 Creating AgentRuntime...');
     console.log('Config:', {
       hasCharacter: !!runtimeConfig.character,
       hasDatabase: !!runtimeConfig.databaseAdapter,
+      databaseType: runtimeConfig.databaseAdapter.constructor.name,
       hasToken: !!runtimeConfig.token,
       pluginCount: runtimeConfig.plugins.length
     });
     
-    // Create runtime with error handling
-    let runtime;
-    try {
-      runtime = new elizaCore.AgentRuntime(runtimeConfig);
-      console.log('✅ AgentRuntime created');
-    } catch (runtimeError) {
-      console.error('❌ AgentRuntime creation failed:', runtimeError.message);
-      
-      // Try with minimal config
-      console.log('🔄 Trying minimal configuration...');
-      const minimalConfig = {
-        character: character,
-        modelProvider: 'openai',
-        databaseAdapter: databaseAdapter
-      };
-      
-      runtime = new elizaCore.AgentRuntime(minimalConfig);
-      console.log('✅ Minimal AgentRuntime created');
-    }
+    // Create runtime
+    const runtime = new elizaCore.AgentRuntime(runtimeConfig);
+    console.log('✅ AgentRuntime created');
     
     // Initialize runtime
     console.log('\n🔄 Initializing runtime...');
     await runtime.initialize();
-    console.log('✅ Runtime initialized');
+    console.log('✅ Runtime initialized successfully!');
     
     // Check what's available
     console.log('\n📊 Runtime Status:');
     console.log('- Character name:', runtime.character?.name);
     console.log('- Model provider:', runtime.modelProvider);
+    console.log('- Database adapter:', runtime.databaseAdapter?.constructor?.name);
     console.log('- Has clients:', !!runtime.clients);
     console.log('- Available clients:', runtime.clients ? Object.keys(runtime.clients) : 'none');
     
@@ -159,30 +251,37 @@ async function main() {
       console.log('⚠️ Twitter client not found');
     }
     
-    console.log('\n🎉 DragonTrade Agent Started Successfully!');
-    console.log('🚀 Agent is now running and monitoring for activity...');
+    console.log('\n🎉 DRAGONTRADE AGENT STARTED SUCCESSFULLY!');
+    console.log('🚀 Agent is now running and monitoring for Twitter activity...');
     console.log('📱 Expected posting: Every 90-180 minutes');
     console.log('🏷️ Branding: aideazz.xyz and $AZ');
+    console.log('⏰ Started at:', new Date().toISOString());
     
-    // Simple monitoring
+    // Enhanced monitoring
     let minutes = 0;
     setInterval(() => {
       minutes++;
-      console.log(`[${new Date().toISOString()}] 🐉 Running: ${minutes} minutes`);
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] 🐉 DragonTrade Agent: ${minutes} minutes running`);
       
-      // Show posting countdown every 30 minutes
-      if (minutes % 30 === 0) {
-        console.log(`📊 Status: Agent active, next post window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} minutes`);
+      // Show detailed status every 15 minutes
+      if (minutes % 15 === 0) {
+        console.log(`📊 Status Check:`);
+        console.log(`   - Runtime active: ${!!runtime}`);
+        console.log(`   - Twitter client: ${runtime.clients?.twitter ? 'CONNECTED' : 'NOT FOUND'}`);
+        console.log(`   - Next post window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} minutes`);
+        console.log(`   - Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
       }
     }, 60000);
     
     // Graceful shutdown
     process.on('SIGINT', async () => {
-      console.log('\n🛑 Shutting down...');
+      console.log('\n🛑 Shutting down DragonTrade Agent...');
       try {
         if (runtime?.stop) await runtime.stop();
+        console.log('✅ Shutdown complete');
       } catch (err) {
-        console.error('Shutdown error:', err.message);
+        console.error('❌ Shutdown error:', err.message);
       }
       process.exit(0);
     });
@@ -196,7 +295,7 @@ async function main() {
     console.error('\n🔍 Debug Info:');
     console.error('- ElizaCore available:', !!elizaCore);
     console.error('- AgentRuntime available:', !!elizaCore.AgentRuntime);
-    console.error('- MemoryCacheAdapter available:', !!elizaCore.MemoryCacheAdapter);
+    console.error('- DatabaseAdapter available:', !!elizaCore.DatabaseAdapter);
     console.error('- Character file exists:', fs.existsSync(characterPath));
     
     process.exit(1);
