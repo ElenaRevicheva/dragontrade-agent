@@ -1,7 +1,7 @@
-import elizaCore from '@elizaos/core';
-import webSearchPlugin from '@elizaos/plugin-web-search';
-import coinmarketcapPlugin from '@elizaos/plugin-coinmarketcap';
-import twitterPlugin from '@elizaos/plugin-twitter';
+import * as elizaCore from '@elizaos/core';
+import * as webSearchPlugin from '@elizaos/plugin-web-search';
+import * as coinmarketcapPlugin from '@elizaos/plugin-coinmarketcap';
+import * as twitterPlugin from '@elizaos/plugin-twitter';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
@@ -18,36 +18,31 @@ const character = JSON.parse(fs.readFileSync(characterPath, 'utf8'));
 async function main() {
   try {
     console.log('Starting DragonTrade Agent...');
-    console.log('Available elizaCore exports:', Object.keys(elizaCore));
+    console.log('ElizaCore exports:', Object.keys(elizaCore));
+    console.log('WebSearch exports:', Object.keys(webSearchPlugin));
+    console.log('CoinMarketCap exports:', Object.keys(coinmarketcapPlugin));
+    console.log('Twitter exports:', Object.keys(twitterPlugin));
     
-    // Try to find the correct constructor/function
-    const AgentClass = elizaCore.Agent || elizaCore.default || elizaCore;
+    // Try to find the correct function/class
+    const startFn = elizaCore.startAgent || elizaCore.Agent || elizaCore.createAgent || elizaCore.default;
     
-    if (typeof AgentClass === 'function') {
-      const agent = new AgentClass({
-        character,
-        plugins: [
-          webSearchPlugin,
-          coinmarketcapPlugin,
-          twitterPlugin
-        ]
-      });
-
-      if (agent.start) {
-        await agent.start();
+    if (startFn) {
+      console.log('Found start function:', typeof startFn);
+      
+      if (typeof startFn === 'function') {
+        const agent = await startFn({
+          character,
+          plugins: [
+            webSearchPlugin.default || webSearchPlugin,
+            coinmarketcapPlugin.default || coinmarketcapPlugin,
+            twitterPlugin.default || twitterPlugin
+          ]
+        });
+        
+        console.log('Agent created:', !!agent);
       }
-    } else if (typeof elizaCore.startAgent === 'function') {
-      await elizaCore.startAgent({
-        character,
-        plugins: [
-          webSearchPlugin,
-          coinmarketcapPlugin,
-          twitterPlugin
-        ]
-      });
     } else {
-      console.log('ElizaCore structure:', elizaCore);
-      throw new Error('Could not find Agent constructor or startAgent function');
+      console.log('Available functions in elizaCore:', elizaCore);
     }
 
     console.log('DragonTrade Agent started successfully!');
