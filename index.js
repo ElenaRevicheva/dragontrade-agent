@@ -41,142 +41,230 @@ async function main() {
     console.log(`Character loaded: ${character.name}`);
     console.log(`Clients: ${character.clients?.join(', ')}`);
     
-    // Create database adapter - Try different types
+    // Create enhanced database adapter with proper embedding support
     console.log('\n🗄️ Creating database adapter...');
-    let databaseAdapter;
     
-    // Check available database adapters
-    console.log('Available adapters:', {
-      DatabaseAdapter: !!elizaCore.DatabaseAdapter,
-      DbCacheAdapter: !!elizaCore.DbCacheAdapter,
-      MemoryCacheAdapter: !!elizaCore.MemoryCacheAdapter,
-      FsCacheAdapter: !!elizaCore.FsCacheAdapter
-    });
-    
-    // Try creating a proper database adapter
-    try {
-      // Option 1: Try extending DatabaseAdapter
-      if (elizaCore.DatabaseAdapter) {
-        console.log('🔄 Trying DatabaseAdapter...');
+    class EnhancedMemoryAdapter extends elizaCore.DatabaseAdapter {
+      constructor() {
+        super();
+        this.memories = new Map();
+        this.relationships = new Map();
+        this.goals = new Map();
+        this.rooms = new Map();
+        this.participants = new Map();
+        this.embeddings = new Map(); // For caching embeddings
+        this.accounts = new Map();
+      }
+      
+      // Account methods
+      async getAccountById(userId) {
+        return this.accounts.get(userId) || null;
+      }
+      
+      async createAccount(account) {
+        const id = account.id || account.userId || Date.now().toString();
+        const fullAccount = { ...account, id };
+        this.accounts.set(id, fullAccount);
+        return fullAccount;
+      }
+      
+      // Memory methods
+      async getMemoryById(id) {
+        return this.memories.get(id) || null;
+      }
+      
+      async getMemories(params = {}) {
+        let memories = Array.from(this.memories.values());
         
-        // Create a simple in-memory implementation
-        class SimpleMemoryAdapter extends elizaCore.DatabaseAdapter {
-          constructor() {
-            super();
-            this.memories = new Map();
-            this.relationships = new Map();
-            this.goals = new Map();
-            this.rooms = new Map();
-            this.participants = new Map();
-          }
-          
-          // Required memory methods
-          async getMemoryById(id) {
-            return this.memories.get(id) || null;
-          }
-          
-          async getMemories(params) {
-            return Array.from(this.memories.values());
-          }
-          
-          async createMemory(memory) {
-            const id = memory.id || Date.now().toString();
-            this.memories.set(id, { ...memory, id });
-            return { ...memory, id };
-          }
-          
-          async removeMemory(id) {
-            return this.memories.delete(id);
-          }
-          
-          // Required relationship methods
-          async getRelationships(params) {
-            return Array.from(this.relationships.values());
-          }
-          
-          async createRelationship(relationship) {
-            const id = relationship.id || Date.now().toString();
-            this.relationships.set(id, { ...relationship, id });
-            return { ...relationship, id };
-          }
-          
-          // Required goal methods
-          async getGoals(params) {
-            return Array.from(this.goals.values());
-          }
-          
-          async createGoal(goal) {
-            const id = goal.id || Date.now().toString();
-            this.goals.set(id, { ...goal, id });
-            return { ...goal, id };
-          }
-          
-          async updateGoal(goal) {
-            this.goals.set(goal.id, goal);
-            return goal;
-          }
-          
-          async removeGoal(id) {
-            return this.goals.delete(id);
-          }
-          
-          // Required room methods
-          async getRoom(id) {
-            return this.rooms.get(id) || null;
-          }
-          
-          async createRoom(room) {
-            const id = room.id || Date.now().toString();
-            this.rooms.set(id, { ...room, id });
-            return { ...room, id };
-          }
-          
-          // Required participant methods
-          async getParticipantsForAccount(userId) {
-            return Array.from(this.participants.values()).filter(p => p.userId === userId);
-          }
-          
-          async getParticipantUserState(roomId, userId) {
-            return this.participants.get(`${roomId}-${userId}`) || null;
-          }
-          
-          async setParticipantUserState(roomId, userId, state) {
-            this.participants.set(`${roomId}-${userId}`, { roomId, userId, ...state });
-            return { roomId, userId, ...state };
-          }
-          
-          // Cache methods for compatibility
-          async getCachedEmbeddings(text) {
-            return null;
-          }
-          
-          async setCachedEmbeddings(text, embeddings) {
-            return true;
-          }
+        if (params.roomId) {
+          memories = memories.filter(m => m.roomId === params.roomId);
+        }
+        if (params.userId) {
+          memories = memories.filter(m => m.userId === params.userId);
+        }
+        if (params.agentId) {
+          memories = memories.filter(m => m.agentId === params.agentId);
+        }
+        if (params.count) {
+          memories = memories.slice(0, params.count);
         }
         
-        databaseAdapter = new SimpleMemoryAdapter();
-        console.log('✅ Custom DatabaseAdapter created');
+        return memories;
       }
-    } catch (err) {
-      console.log('❌ DatabaseAdapter creation failed:', err.message);
-    }
-    
-    // Fallback: Try other adapters
-    if (!databaseAdapter) {
-      try {
-        if (elizaCore.DbCacheAdapter) {
-          databaseAdapter = new elizaCore.DbCacheAdapter();
-          console.log('✅ DbCacheAdapter created');
+      
+      async createMemory(memory) {
+        const id = memory.id || Date.now().toString();
+        const fullMemory = { 
+          ...memory, 
+          id,
+          createdAt: memory.createdAt || Date.now()
+        };
+        this.memories.set(id, fullMemory);
+        return fullMemory;
+      }
+      
+      async removeMemory(id) {
+        return this.memories.delete(id);
+      }
+      
+      async updateMemory(memory) {
+        if (this.memories.has(memory.id)) {
+          this.memories.set(memory.id, memory);
+          return memory;
         }
-      } catch (err) {
-        console.log('❌ DbCacheAdapter failed:', err.message);
+        return null;
+      }
+      
+      // Relationship methods
+      async getRelationships(params = {}) {
+        let relationships = Array.from(this.relationships.values());
+        
+        if (params.userId1) {
+          relationships = relationships.filter(r => r.userId1 === params.userId1 || r.userId2 === params.userId1);
+        }
+        
+        return relationships;
+      }
+      
+      async createRelationship(relationship) {
+        const id = relationship.id || Date.now().toString();
+        const fullRelationship = { ...relationship, id };
+        this.relationships.set(id, fullRelationship);
+        return fullRelationship;
+      }
+      
+      async getRelationship(params) {
+        return Array.from(this.relationships.values()).find(r => 
+          (r.userId1 === params.userId1 && r.userId2 === params.userId2) ||
+          (r.userId1 === params.userId2 && r.userId2 === params.userId1)
+        ) || null;
+      }
+      
+      // Goal methods
+      async getGoals(params = {}) {
+        let goals = Array.from(this.goals.values());
+        
+        if (params.userId) {
+          goals = goals.filter(g => g.userId === params.userId);
+        }
+        if (params.roomId) {
+          goals = goals.filter(g => g.roomId === params.roomId);
+        }
+        if (params.onlyInProgress) {
+          goals = goals.filter(g => g.status === 'IN_PROGRESS');
+        }
+        if (params.count) {
+          goals = goals.slice(0, params.count);
+        }
+        
+        return goals;
+      }
+      
+      async createGoal(goal) {
+        const id = goal.id || Date.now().toString();
+        const fullGoal = { 
+          ...goal, 
+          id,
+          createdAt: goal.createdAt || Date.now(),
+          status: goal.status || 'IN_PROGRESS'
+        };
+        this.goals.set(id, fullGoal);
+        return fullGoal;
+      }
+      
+      async updateGoal(goal) {
+        this.goals.set(goal.id, goal);
+        return goal;
+      }
+      
+      async removeGoal(id) {
+        return this.goals.delete(id);
+      }
+      
+      // Room methods
+      async getRoom(id) {
+        return this.rooms.get(id) || null;
+      }
+      
+      async createRoom(room) {
+        const id = room.id || Date.now().toString();
+        const fullRoom = { ...room, id };
+        this.rooms.set(id, fullRoom);
+        return fullRoom;
+      }
+      
+      async removeRoom(id) {
+        return this.rooms.delete(id);
+      }
+      
+      // Participant methods
+      async getParticipantsForAccount(userId) {
+        return Array.from(this.participants.values()).filter(p => p.userId === userId);
+      }
+      
+      async getParticipantUserState(roomId, userId) {
+        return this.participants.get(`${roomId}-${userId}`) || null;
+      }
+      
+      async setParticipantUserState(roomId, userId, state) {
+        const participantState = { roomId, userId, ...state };
+        this.participants.set(`${roomId}-${userId}`, participantState);
+        return participantState;
+      }
+      
+      async getParticipantsForRoom(roomId) {
+        return Array.from(this.participants.values()).filter(p => p.roomId === roomId);
+      }
+      
+      // Enhanced embedding cache methods
+      async getCachedEmbeddings(text) {
+        if (!text || typeof text !== 'string') {
+          console.log('⚠️ Invalid text for embeddings:', typeof text);
+          return null;
+        }
+        
+        const cached = this.embeddings.get(text);
+        if (cached) {
+          console.log('✅ Found cached embedding for text:', text.substring(0, 50) + '...');
+          return cached;
+        }
+        
+        console.log('📝 No cached embedding for text:', text.substring(0, 50) + '...');
+        return null;
+      }
+      
+      async setCachedEmbeddings(text, embeddings) {
+        if (!text || typeof text !== 'string') {
+          console.log('⚠️ Invalid text for caching embeddings:', typeof text);
+          return false;
+        }
+        
+        if (!embeddings) {
+          console.log('⚠️ No embeddings provided for caching');
+          return false;
+        }
+        
+        this.embeddings.set(text, embeddings);
+        console.log('✅ Cached embeddings for text:', text.substring(0, 50) + '...');
+        return true;
+      }
+      
+      // Knowledge methods
+      async searchMemoriesByEmbedding(embedding, params = {}) {
+        // Simple implementation - just return recent memories
+        const memories = await this.getMemories(params);
+        return memories.slice(0, params.count || 10);
+      }
+      
+      // Additional utility methods
+      async log(params) {
+        console.log('📝 Database log:', params);
+        return true;
       }
     }
     
-    if (!databaseAdapter) {
-      throw new Error('Could not create any compatible database adapter');
-    }
+    const databaseAdapter = new EnhancedMemoryAdapter();
+    console.log('✅ Enhanced DatabaseAdapter created with embedding support');
     
     // Prepare plugins
     console.log('\n🔌 Preparing plugins...');
@@ -231,10 +319,18 @@ async function main() {
     const runtime = new elizaCore.AgentRuntime(runtimeConfig);
     console.log('✅ AgentRuntime created');
     
-    // Initialize runtime
+    // Initialize runtime with detailed logging
     console.log('\n🔄 Initializing runtime...');
-    await runtime.initialize();
-    console.log('✅ Runtime initialized successfully!');
+    console.log('🧠 Processing character knowledge...');
+    
+    try {
+      await runtime.initialize();
+      console.log('✅ Runtime initialized successfully!');
+    } catch (initError) {
+      console.error('❌ Runtime initialization failed:', initError.message);
+      console.error('Stack:', initError.stack);
+      throw initError;
+    }
     
     // Check what's available
     console.log('\n📊 Runtime Status:');
@@ -251,7 +347,7 @@ async function main() {
       console.log('⚠️ Twitter client not found');
     }
     
-    console.log('\n🎉 DRAGONTRADE AGENT STARTED SUCCESSFULLY!');
+    console.log('\n🎉 DRAGONTRADE AGENT STARTED SUCCESSFULLY! 🐉');
     console.log('🚀 Agent is now running and monitoring for Twitter activity...');
     console.log('📱 Expected posting: Every 90-180 minutes');
     console.log('🏷️ Branding: aideazz.xyz and $AZ');
@@ -271,6 +367,7 @@ async function main() {
         console.log(`   - Twitter client: ${runtime.clients?.twitter ? 'CONNECTED' : 'NOT FOUND'}`);
         console.log(`   - Next post window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} minutes`);
         console.log(`   - Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+        console.log(`   - Cached embeddings: ${runtime.databaseAdapter?.embeddings?.size || 0}`);
       }
     }, 60000);
     
