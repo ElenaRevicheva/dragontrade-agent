@@ -16,12 +16,12 @@ const characterPath = resolve(__dirname, 'character.json');
 
 async function main() {
   try {
-    console.log('🚀 Starting DragonTrade Agent...');
+    console.log('🚀 Starting DragonTrade Agent (Claude-Powered)...');
     console.log('⏰ Time:', new Date().toISOString());
     
     // Check essential environment variables
     const requiredEnvVars = {
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
       TWITTER_USERNAME: process.env.TWITTER_USERNAME,
       TWITTER_PASSWORD: process.env.TWITTER_PASSWORD,
       TWITTER_EMAIL: process.env.TWITTER_EMAIL
@@ -30,278 +30,240 @@ async function main() {
     console.log('\n🔐 Environment Check:');
     for (const [key, value] of Object.entries(requiredEnvVars)) {
       console.log(`${key}: ${value ? '✅ SET' : '❌ MISSING'}`);
-      if (!value) {
+      if (!value && key === 'ANTHROPIC_API_KEY') {
+        console.log('⚠️ ANTHROPIC_API_KEY missing - will try OPENAI_API_KEY as fallback');
+      } else if (!value) {
         throw new Error(`Missing required environment variable: ${key}`);
       }
+    }
+    
+    // Determine which API to use
+    const useOpenAI = !process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY;
+    const modelProvider = useOpenAI ? 'openai' : 'anthropic';
+    const apiKey = useOpenAI ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
+    
+    console.log(`🤖 Model Provider: ${modelProvider.toUpperCase()}`);
+    console.log(`🔑 API Key: ${apiKey ? 'SET' : 'MISSING'}`);
+    
+    if (!apiKey) {
+      throw new Error('No valid API key found (need ANTHROPIC_API_KEY or OPENAI_API_KEY)');
     }
     
     // Load character
     console.log('\n📋 Loading character...');
     const character = JSON.parse(fs.readFileSync(characterPath, 'utf8'));
-    console.log(`Character loaded: ${character.name}`);
-    console.log(`Clients: ${character.clients?.join(', ')}`);
     
-    // Create enhanced database adapter with proper embedding support
-    console.log('\n🗄️ Creating database adapter...');
+    // Update character to reflect Claude usage
+    const enhancedCharacter = {
+      ...character,
+      modelProvider: modelProvider,
+      bio: [
+        ...character.bio,
+        `Powered by ${modelProvider === 'anthropic' ? 'Claude (Anthropic)' : 'OpenAI'} for superior market analysis`
+      ]
+    };
     
-    class EnhancedMemoryAdapter extends elizaCore.DatabaseAdapter {
+    console.log(`Character loaded: ${enhancedCharacter.name}`);
+    console.log(`Model Provider: ${enhancedCharacter.modelProvider}`);
+    console.log(`Knowledge items: ${enhancedCharacter.knowledge?.length || 0}`);
+    
+    // Enhanced database adapter
+    class ClaudeCompatibleAdapter extends elizaCore.DatabaseAdapter {
       constructor() {
         super();
-        this.memories = new Map();
-        this.relationships = new Map();
-        this.goals = new Map();
-        this.rooms = new Map();
-        this.participants = new Map();
-        this.embeddings = new Map(); // For caching embeddings
-        this.accounts = new Map();
+        this.data = new Map();
+        console.log('🗄️ Initializing Claude-compatible database adapter');
       }
       
-      // Account methods
-      async getAccountById(userId) {
-        return this.accounts.get(userId) || null;
+      // Essential memory methods
+      async getMemoryById(id) { 
+        return this.data.get(`memory_${id}`) || null; 
       }
       
-      async createAccount(account) {
-        const id = account.id || account.userId || Date.now().toString();
-        const fullAccount = { ...account, id };
-        this.accounts.set(id, fullAccount);
-        return fullAccount;
+      async getMemories(params = {}) { 
+        const memories = Array.from(this.data.values()).filter(item => 
+          item.type === 'memory'
+        );
+        return params.count ? memories.slice(0, params.count) : memories;
       }
       
-      // Memory methods
-      async getMemoryById(id) {
-        return this.memories.get(id) || null;
-      }
-      
-      async getMemories(params = {}) {
-        let memories = Array.from(this.memories.values());
-        
-        if (params.roomId) {
-          memories = memories.filter(m => m.roomId === params.roomId);
-        }
-        if (params.userId) {
-          memories = memories.filter(m => m.userId === params.userId);
-        }
-        if (params.agentId) {
-          memories = memories.filter(m => m.agentId === params.agentId);
-        }
-        if (params.count) {
-          memories = memories.slice(0, params.count);
-        }
-        
-        return memories;
-      }
-      
-      async createMemory(memory) {
+      async createMemory(memory) { 
         const id = memory.id || Date.now().toString();
-        const fullMemory = { 
-          ...memory, 
-          id,
-          createdAt: memory.createdAt || Date.now()
-        };
-        this.memories.set(id, fullMemory);
-        return fullMemory;
+        const mem = { ...memory, id, type: 'memory', createdAt: Date.now() };
+        this.data.set(`memory_${id}`, mem);
+        console.log('💾 Created memory:', id);
+        return mem;
       }
       
-      async removeMemory(id) {
-        return this.memories.delete(id);
-      }
-      
-      async updateMemory(memory) {
-        if (this.memories.has(memory.id)) {
-          this.memories.set(memory.id, memory);
-          return memory;
-        }
-        return null;
+      async removeMemory(id) { 
+        return this.data.delete(`memory_${id}`); 
       }
       
       // Relationship methods
-      async getRelationships(params = {}) {
-        let relationships = Array.from(this.relationships.values());
-        
-        if (params.userId1) {
-          relationships = relationships.filter(r => r.userId1 === params.userId1 || r.userId2 === params.userId1);
-        }
-        
-        return relationships;
+      async getRelationships(params = {}) { 
+        return Array.from(this.data.values()).filter(item => item.type === 'relationship');
       }
       
-      async createRelationship(relationship) {
-        const id = relationship.id || Date.now().toString();
-        const fullRelationship = { ...relationship, id };
-        this.relationships.set(id, fullRelationship);
-        return fullRelationship;
-      }
-      
-      async getRelationship(params) {
-        return Array.from(this.relationships.values()).find(r => 
-          (r.userId1 === params.userId1 && r.userId2 === params.userId2) ||
-          (r.userId1 === params.userId2 && r.userId2 === params.userId1)
-        ) || null;
+      async createRelationship(rel) { 
+        const id = rel.id || Date.now().toString();
+        const relationship = { ...rel, id, type: 'relationship' };
+        this.data.set(`rel_${id}`, relationship);
+        return relationship;
       }
       
       // Goal methods
-      async getGoals(params = {}) {
-        let goals = Array.from(this.goals.values());
-        
-        if (params.userId) {
-          goals = goals.filter(g => g.userId === params.userId);
-        }
-        if (params.roomId) {
-          goals = goals.filter(g => g.roomId === params.roomId);
-        }
-        if (params.onlyInProgress) {
-          goals = goals.filter(g => g.status === 'IN_PROGRESS');
-        }
-        if (params.count) {
-          goals = goals.slice(0, params.count);
-        }
-        
-        return goals;
+      async getGoals(params = {}) { 
+        return Array.from(this.data.values()).filter(item => item.type === 'goal');
       }
       
-      async createGoal(goal) {
+      async createGoal(goal) { 
         const id = goal.id || Date.now().toString();
-        const fullGoal = { 
-          ...goal, 
-          id,
-          createdAt: goal.createdAt || Date.now(),
-          status: goal.status || 'IN_PROGRESS'
-        };
-        this.goals.set(id, fullGoal);
-        return fullGoal;
+        const g = { ...goal, id, type: 'goal', status: 'IN_PROGRESS' };
+        this.data.set(`goal_${id}`, g);
+        return g;
       }
       
-      async updateGoal(goal) {
-        this.goals.set(goal.id, goal);
+      async updateGoal(goal) { 
+        this.data.set(`goal_${goal.id}`, { ...goal, type: 'goal' });
         return goal;
       }
       
-      async removeGoal(id) {
-        return this.goals.delete(id);
+      async removeGoal(id) { 
+        return this.data.delete(`goal_${id}`); 
       }
       
       // Room methods
-      async getRoom(id) {
-        return this.rooms.get(id) || null;
+      async getRoom(id) { 
+        return this.data.get(`room_${id}`) || null; 
       }
       
-      async createRoom(room) {
+      async createRoom(room) { 
         const id = room.id || Date.now().toString();
-        const fullRoom = { ...room, id };
-        this.rooms.set(id, fullRoom);
-        return fullRoom;
-      }
-      
-      async removeRoom(id) {
-        return this.rooms.delete(id);
+        const r = { ...room, id, type: 'room' };
+        this.data.set(`room_${id}`, r);
+        return r;
       }
       
       // Participant methods
-      async getParticipantsForAccount(userId) {
-        return Array.from(this.participants.values()).filter(p => p.userId === userId);
+      async getParticipantsForAccount(userId) { 
+        return Array.from(this.data.values()).filter(item => 
+          item.type === 'participant' && item.userId === userId
+        );
       }
       
-      async getParticipantUserState(roomId, userId) {
-        return this.participants.get(`${roomId}-${userId}`) || null;
+      async getParticipantUserState(roomId, userId) { 
+        return this.data.get(`participant_${roomId}_${userId}`) || null; 
       }
       
-      async setParticipantUserState(roomId, userId, state) {
-        const participantState = { roomId, userId, ...state };
-        this.participants.set(`${roomId}-${userId}`, participantState);
+      async setParticipantUserState(roomId, userId, state) { 
+        const participantState = { 
+          roomId, 
+          userId, 
+          ...state, 
+          type: 'participant',
+          updatedAt: Date.now()
+        };
+        this.data.set(`participant_${roomId}_${userId}`, participantState);
         return participantState;
       }
       
-      async getParticipantsForRoom(roomId) {
-        return Array.from(this.participants.values()).filter(p => p.roomId === roomId);
-      }
-      
-      // Enhanced embedding cache methods
-      async getCachedEmbeddings(text) {
-        if (!text || typeof text !== 'string') {
-          console.log('⚠️ Invalid text for embeddings:', typeof text);
-          return null;
-        }
+      // Embedding methods - Claude-friendly
+      async getCachedEmbeddings(text) { 
+        if (!text || typeof text !== 'string') return null;
         
-        const cached = this.embeddings.get(text);
+        const cached = this.data.get(`embedding_${text.slice(0, 50)}`);
         if (cached) {
-          console.log('✅ Found cached embedding for text:', text.substring(0, 50) + '...');
-          return cached;
+          console.log('✅ Found cached embedding');
+          return cached.embeddings;
         }
-        
-        console.log('📝 No cached embedding for text:', text.substring(0, 50) + '...');
-        return null;
+        console.log('📝 No cached embedding found');
+        return null; 
       }
       
-      async setCachedEmbeddings(text, embeddings) {
-        if (!text || typeof text !== 'string') {
-          console.log('⚠️ Invalid text for caching embeddings:', typeof text);
-          return false;
-        }
+      async setCachedEmbeddings(text, embeddings) { 
+        if (!text || !embeddings) return false;
         
-        if (!embeddings) {
-          console.log('⚠️ No embeddings provided for caching');
-          return false;
-        }
-        
-        this.embeddings.set(text, embeddings);
-        console.log('✅ Cached embeddings for text:', text.substring(0, 50) + '...');
-        return true;
+        const key = `embedding_${text.slice(0, 50)}`;
+        this.data.set(key, { 
+          text: text.slice(0, 100), 
+          embeddings, 
+          type: 'embedding',
+          createdAt: Date.now() 
+        });
+        console.log('💾 Cached embeddings for text');
+        return true; 
       }
       
-      // Knowledge methods
-      async searchMemoriesByEmbedding(embedding, params = {}) {
-        // Simple implementation - just return recent memories
+      // Additional required methods
+      async getAccountById(userId) { 
+        return this.data.get(`account_${userId}`) || null; 
+      }
+      
+      async createAccount(account) { 
+        const id = account.id || account.userId || Date.now().toString();
+        const acc = { ...account, id, type: 'account' };
+        this.data.set(`account_${id}`, acc);
+        return acc; 
+      }
+      
+      async searchMemoriesByEmbedding(embedding, params = {}) { 
+        // Simple implementation - return recent memories
         const memories = await this.getMemories(params);
-        return memories.slice(0, params.count || 10);
+        return memories.slice(0, params.count || 5);
       }
       
-      // Additional utility methods
-      async log(params) {
-        console.log('📝 Database log:', params);
-        return true;
+      async log(params) { 
+        console.log('📝 Database log:', params.message || params);
+        return true; 
       }
     }
     
-    const databaseAdapter = new EnhancedMemoryAdapter();
-    console.log('✅ Enhanced DatabaseAdapter created with embedding support');
+    const databaseAdapter = new ClaudeCompatibleAdapter();
+    console.log('✅ Claude-compatible DatabaseAdapter created');
     
     // Prepare plugins
     console.log('\n🔌 Preparing plugins...');
     const plugins = [];
     
-    // Add each plugin safely
+    // Prioritize Twitter for posting
     try {
-      const webSearch = webSearchPlugin.default || webSearchPlugin;
-      if (webSearch) plugins.push(webSearch);
-      console.log('✅ Web search plugin added');
+      const twitter = twitterPlugin.default || twitterPlugin;
+      if (twitter) {
+        plugins.push(twitter);
+        console.log('✅ Twitter plugin added (primary)');
+      }
     } catch (err) {
-      console.log('⚠️ Web search plugin failed:', err.message);
+      console.log('⚠️ Twitter plugin failed:', err.message);
     }
     
+    // Add market data plugins
     try {
       const coinmarket = coinmarketcapPlugin.default || coinmarketcapPlugin;
-      if (coinmarket) plugins.push(coinmarket);
-      console.log('✅ CoinMarketCap plugin added');
+      if (coinmarket) {
+        plugins.push(coinmarket);
+        console.log('✅ CoinMarketCap plugin added');
+      }
     } catch (err) {
       console.log('⚠️ CoinMarketCap plugin failed:', err.message);
     }
     
     try {
-      const twitter = twitterPlugin.default || twitterPlugin;
-      if (twitter) plugins.push(twitter);
-      console.log('✅ Twitter plugin added');
+      const webSearch = webSearchPlugin.default || webSearchPlugin;
+      if (webSearch) {
+        plugins.push(webSearch);
+        console.log('✅ Web search plugin added');
+      }
     } catch (err) {
-      console.log('⚠️ Twitter plugin failed:', err.message);
+      console.log('⚠️ Web search plugin failed:', err.message);
     }
     
     console.log(`Total plugins loaded: ${plugins.length}`);
     
-    // Create runtime config
+    // Create runtime config for Claude/Anthropic
     const runtimeConfig = {
-      character: character,
-      modelProvider: 'openai',
-      token: process.env.OPENAI_API_KEY,
+      character: enhancedCharacter,
+      modelProvider: modelProvider,
+      token: apiKey,
       databaseAdapter: databaseAdapter,
       plugins: plugins
     };
@@ -309,48 +271,48 @@ async function main() {
     console.log('\n🤖 Creating AgentRuntime...');
     console.log('Config:', {
       hasCharacter: !!runtimeConfig.character,
+      modelProvider: runtimeConfig.modelProvider,
       hasDatabase: !!runtimeConfig.databaseAdapter,
-      databaseType: runtimeConfig.databaseAdapter.constructor.name,
       hasToken: !!runtimeConfig.token,
       pluginCount: runtimeConfig.plugins.length
     });
     
     // Create runtime
     const runtime = new elizaCore.AgentRuntime(runtimeConfig);
-    console.log('✅ AgentRuntime created');
+    console.log('✅ AgentRuntime created with', modelProvider.toUpperCase());
     
-    // Initialize runtime with detailed logging
+    // Initialize runtime
     console.log('\n🔄 Initializing runtime...');
-    console.log('🧠 Processing character knowledge...');
+    console.log('🧠 Processing character knowledge with', modelProvider.toUpperCase(), '...');
     
-    try {
-      await runtime.initialize();
-      console.log('✅ Runtime initialized successfully!');
-    } catch (initError) {
-      console.error('❌ Runtime initialization failed:', initError.message);
-      console.error('Stack:', initError.stack);
-      throw initError;
-    }
+    await runtime.initialize();
+    console.log('✅ Runtime initialized successfully!');
     
     // Check what's available
     console.log('\n📊 Runtime Status:');
     console.log('- Character name:', runtime.character?.name);
     console.log('- Model provider:', runtime.modelProvider);
+    console.log('- AI Model:', modelProvider === 'anthropic' ? 'Claude (Anthropic)' : 'GPT (OpenAI)');
     console.log('- Database adapter:', runtime.databaseAdapter?.constructor?.name);
     console.log('- Has clients:', !!runtime.clients);
     console.log('- Available clients:', runtime.clients ? Object.keys(runtime.clients) : 'none');
     
     if (runtime.clients?.twitter) {
-      console.log('- Twitter client type:', typeof runtime.clients.twitter);
       console.log('✅ Twitter client is available!');
     } else {
       console.log('⚠️ Twitter client not found');
     }
     
-    console.log('\n🎉 DRAGONTRADE AGENT STARTED SUCCESSFULLY! 🐉');
-    console.log('🚀 Agent is now running and monitoring for Twitter activity...');
-    console.log('📱 Expected posting: Every 90-180 minutes');
-    console.log('🏷️ Branding: aideazz.xyz and $AZ');
+    console.log('\n🎉 DRAGONTRADE AGENT STARTED SUCCESSFULLY! 🐉🚀');
+    console.log('╔══════════════════════════════════════════════════╗');
+    console.log('║          🐉 DRAGONTRADE IS LIVE! 🐉             ║');
+    console.log('╠══════════════════════════════════════════════════╣');
+    console.log(`║ 🤖 AI Model: ${modelProvider === 'anthropic' ? 'Claude (Anthropic)' : 'GPT (OpenAI)'}${''.padEnd(20 - (modelProvider === 'anthropic' ? 'Claude (Anthropic)' : 'GPT (OpenAI)').length)} ║`);
+    console.log('║ 📱 Twitter: @reviceva                           ║');
+    console.log('║ 🏷️  Branding: aideazz.xyz and $AZ               ║');
+    console.log('║ ⏰ Posting: Every 90-180 minutes                ║');
+    console.log('║ 💰 Cost: ~$5-15/month (vs Fleek $50+)          ║');
+    console.log('╚══════════════════════════════════════════════════╝');
     console.log('⏰ Started at:', new Date().toISOString());
     
     // Enhanced monitoring
@@ -358,16 +320,18 @@ async function main() {
     setInterval(() => {
       minutes++;
       const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] 🐉 DragonTrade Agent: ${minutes} minutes running`);
       
-      // Show detailed status every 15 minutes
-      if (minutes % 15 === 0) {
-        console.log(`📊 Status Check:`);
-        console.log(`   - Runtime active: ${!!runtime}`);
-        console.log(`   - Twitter client: ${runtime.clients?.twitter ? 'CONNECTED' : 'NOT FOUND'}`);
-        console.log(`   - Next post window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} minutes`);
-        console.log(`   - Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
-        console.log(`   - Cached embeddings: ${runtime.databaseAdapter?.embeddings?.size || 0}`);
+      if (minutes % 30 === 0) {
+        console.log(`\n🎯 [${timestamp}] === DRAGONTRADE STATUS ===`);
+        console.log(`🔄 Runtime: ${minutes} minutes ACTIVE`);
+        console.log(`🤖 AI Model: ${modelProvider.toUpperCase()}`);
+        console.log(`🐦 Twitter: ${runtime.clients?.twitter ? 'CONNECTED' : 'DISCONNECTED'}`);
+        console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+        console.log(`🗄️  Database entries: ${runtime.databaseAdapter?.data?.size || 0}`);
+        console.log(`⏰ Next post window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} min`);
+        console.log(`═══════════════════════════════════════════════`);
+      } else {
+        console.log(`[${timestamp}] 🐉 DragonTrade (${modelProvider.toUpperCase()}): ${minutes}min | Status: ACTIVE`);
       }
     }, 60000);
     
@@ -388,18 +352,17 @@ async function main() {
     console.error('Message:', error.message);
     console.error('Stack:', error.stack);
     
-    // Show debug info
     console.error('\n🔍 Debug Info:');
-    console.error('- ElizaCore available:', !!elizaCore);
-    console.error('- AgentRuntime available:', !!elizaCore.AgentRuntime);
-    console.error('- DatabaseAdapter available:', !!elizaCore.DatabaseAdapter);
-    console.error('- Character file exists:', fs.existsSync(characterPath));
+    console.error('- ANTHROPIC_API_KEY:', !!process.env.ANTHROPIC_API_KEY);
+    console.error('- OPENAI_API_KEY fallback:', !!process.env.OPENAI_API_KEY);
+    console.error('- TWITTER credentials:', !!process.env.TWITTER_USERNAME);
+    console.error('- Character file:', fs.existsSync(characterPath));
     
     process.exit(1);
   }
 }
 
-console.log('🌟 Initializing DragonTrade Agent...');
+console.log('🌟 Initializing DragonTrade Agent (Claude-Powered)...');
 main().catch(err => {
   console.error('💥 Startup failed:', err);
   process.exit(1);
