@@ -53,6 +53,34 @@ async function main() {
     console.log('CoinMarketCap exports:', Object.keys(coinmarketcapPlugin));
     console.log('Twitter exports:', Object.keys(twitterPlugin));
     
+    // Database Adapter Creation
+    console.log('\n🗄️ ===== DATABASE ADAPTER CREATION =====');
+    console.log('Available database adapters:', {
+      MemoryCacheAdapter: !!elizaCore.MemoryCacheAdapter,
+      FsCacheAdapter: !!elizaCore.FsCacheAdapter,
+      DbCacheAdapter: !!elizaCore.DbCacheAdapter
+    });
+    
+    let databaseAdapter;
+    try {
+      // Try different database adapters in order of preference
+      if (elizaCore.MemoryCacheAdapter) {
+        databaseAdapter = new elizaCore.MemoryCacheAdapter();
+        console.log('✅ Created MemoryCacheAdapter');
+      } else if (elizaCore.FsCacheAdapter) {
+        databaseAdapter = new elizaCore.FsCacheAdapter();
+        console.log('✅ Created FsCacheAdapter');
+      } else if (elizaCore.DbCacheAdapter) {
+        databaseAdapter = new elizaCore.DbCacheAdapter();
+        console.log('✅ Created DbCacheAdapter');
+      } else {
+        throw new Error('No suitable database adapter found');
+      }
+    } catch (dbError) {
+      console.error('❌ Database adapter creation error:', dbError);
+      throw dbError;
+    }
+    
     // AgentRuntime Detection
     console.log('\n🤖 ===== AGENTRUNTIME DETECTION =====');
     console.log('AgentRuntime available:', !!elizaCore.AgentRuntime);
@@ -65,6 +93,7 @@ async function main() {
         character: character,
         modelProvider: 'openai',
         token: process.env.OPENAI_API_KEY,
+        databaseAdapter: databaseAdapter, // 🔑 KEY FIX: Add database adapter
         plugins: [
           webSearchPlugin.default || webSearchPlugin,
           coinmarketcapPlugin.default || coinmarketcapPlugin,
@@ -76,10 +105,13 @@ async function main() {
         hasCharacter: !!runtimeConfig.character,
         modelProvider: runtimeConfig.modelProvider,
         hasToken: !!runtimeConfig.token,
+        hasDatabaseAdapter: !!runtimeConfig.databaseAdapter,
+        databaseAdapterType: runtimeConfig.databaseAdapter?.constructor?.name,
         pluginCount: runtimeConfig.plugins.length,
         pluginTypes: runtimeConfig.plugins.map(p => typeof p)
       });
       
+      console.log('🔨 Creating AgentRuntime instance...');
       const runtime = new elizaCore.AgentRuntime(runtimeConfig);
       console.log('✅ AgentRuntime instance created successfully');
       
@@ -95,12 +127,21 @@ async function main() {
       // If Twitter client exists, get more details
       if (runtime.clients && runtime.clients.twitter) {
         console.log('Twitter client type:', typeof runtime.clients.twitter);
-        console.log('Twitter client methods:', Object.getOwnPropertyNames(runtime.clients.twitter));
+        console.log('Twitter client methods:', Object.getOwnPropertyNames(runtime.clients.twitter).slice(0, 10));
+        console.log('Twitter client constructor:', runtime.clients.twitter.constructor?.name);
       }
+      
+      // Check runtime services
+      console.log('\n🔧 ===== RUNTIME SERVICES CHECK =====');
+      console.log('Runtime services:', runtime.services ? Object.keys(runtime.services) : 'No services property');
+      console.log('Runtime actions:', runtime.actions ? runtime.actions.length : 'No actions property');
+      console.log('Runtime evaluators:', runtime.evaluators ? runtime.evaluators.length : 'No evaluators property');
       
       console.log('\n🎉 ===== DRAGONTRADE AGENT STARTED SUCCESSFULLY =====');
       console.log('⏰ Started at:', new Date().toISOString());
       console.log('🚀 Monitoring for Twitter activity...');
+      console.log('📱 Expected first post: Within 90-180 minutes');
+      console.log('🏷️ Posts will be branded with: aideazz.xyz and $AZ');
       
       // Enhanced monitoring loop
       let counter = 0;
@@ -109,12 +150,13 @@ async function main() {
         const timestamp = new Date().toISOString();
         console.log(`\n📊 [${timestamp}] === STATUS CHECK ${counter} ===`);
         console.log('🔄 Agent running time:', counter, 'minutes');
-        console.log('💾 Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024, 'MB');
+        console.log('💾 Memory usage:', Math.round(process.memoryUsage().heapUsed / 1024 / 1024), 'MB');
         
         // Check if runtime is still alive
         try {
-          if (runtime && typeof runtime.cleanup !== 'undefined') {
+          if (runtime && runtime.character) {
             console.log('🤖 Runtime status: ALIVE');
+            console.log('👤 Character:', runtime.character.name);
           }
           
           // Check Twitter client status
@@ -124,10 +166,26 @@ async function main() {
             console.log('🐦 Twitter client: NOT FOUND');
           }
           
-          // Log expected next post time
-          const nextPostMin = 90 - (counter % 90);
-          const nextPostMax = 180 - (counter % 180);
-          console.log('⏰ Next post window: ', nextPostMin, '-', nextPostMax, 'minutes');
+          // Check database adapter
+          if (runtime.databaseAdapter) {
+            console.log('🗄️ Database adapter: ACTIVE');
+          }
+          
+          // Log expected next post time windows
+          const currentMinute = counter;
+          const nextPost90 = 90 - (currentMinute % 90);
+          const nextPost180 = 180 - (currentMinute % 180);
+          console.log('⏰ Next post opportunities:');
+          console.log('   - 90min cycle: in', nextPost90, 'minutes');
+          console.log('   - 180min cycle: in', nextPost180, 'minutes');
+          
+          // Show Twitter posting settings
+          if (counter === 1) {
+            console.log('🐦 Twitter Settings:');
+            console.log('   - POST_IMMEDIATELY:', process.env.POST_IMMEDIATELY);
+            console.log('   - POST_INTERVAL_MIN:', process.env.POST_INTERVAL_MIN);
+            console.log('   - POST_INTERVAL_MAX:', process.env.POST_INTERVAL_MAX);
+          }
           
         } catch (err) {
           console.error('❌ Status check error:', err.message);
@@ -151,14 +209,16 @@ async function main() {
         process.exit(0);
       });
       
-      // Keep process alive
+      // Keep process alive with error handling
       process.on('uncaughtException', (err) => {
         console.error('💥 UNCAUGHT EXCEPTION:', err);
         console.error('Stack:', err.stack);
+        // Don't exit, try to continue
       });
       
       process.on('unhandledRejection', (reason, promise) => {
         console.error('💥 UNHANDLED REJECTION at:', promise, 'reason:', reason);
+        // Don't exit, try to continue
       });
       
     } else {
@@ -166,6 +226,7 @@ async function main() {
       console.log('Available constructors:', Object.keys(elizaCore).filter(key => 
         typeof elizaCore[key] === 'function' && elizaCore[key].name
       ));
+      throw new Error('AgentRuntime not available');
     }
     
   } catch (error) {
@@ -174,6 +235,15 @@ async function main() {
     console.error('Error stack:', error.stack);
     console.error('Error name:', error.name);
     console.error('Error cause:', error.cause);
+    
+    // Additional debugging info
+    console.error('\n🔍 ===== DEBUG INFO =====');
+    console.error('Available elizaCore exports:', Object.keys(elizaCore));
+    console.error('Character loaded:', !!character);
+    console.error('Environment check:');
+    console.error('- OPENAI_API_KEY:', !!process.env.OPENAI_API_KEY);
+    console.error('- TWITTER_USERNAME:', !!process.env.TWITTER_USERNAME);
+    
     process.exit(1);
   }
 }
@@ -184,4 +254,7 @@ process.on('warning', (warning) => {
 });
 
 console.log('🌟 Starting DragonTrade Agent with MAXIMUM DEBUG...');
-main().catch(console.error);
+main().catch((err) => {
+  console.error('🔥 Main function error:', err);
+  process.exit(1);
+});
