@@ -1,6 +1,7 @@
-import { startAgent } from '@elizaos/core';
+import { Agent } from '@elizaos/core';
 import webSearchPlugin from '@elizaos/plugin-web-search';
 import coinmarketcapPlugin from '@elizaos/plugin-coinmarketcap';
+import twitterPlugin from '@elizaos/plugin-twitter';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
@@ -18,20 +19,22 @@ async function main() {
   try {
     console.log('Starting DragonTrade Agent...');
     
-    const agent = await startAgent({
+    const agent = new Agent({
       character,
       plugins: [
         webSearchPlugin,
-        coinmarketcapPlugin
-      ],
-      clients: ['twitter'],
-      modelProvider: 'openai'
+        coinmarketcapPlugin,
+        twitterPlugin
+      ]
     });
+
+    await agent.start();
 
     console.log('DragonTrade Agent started successfully!');
     
     process.on('SIGINT', () => {
       console.log('Shutting down DragonTrade Agent...');
+      agent.stop();
       process.exit(0);
     });
     
