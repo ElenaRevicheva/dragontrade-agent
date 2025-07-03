@@ -13,7 +13,10 @@
     "@elizaos/plugin-web-search": "^0.1.7",
     "@elizaos/plugin-coinmarketcap": "^0.1.7",
     "@elizaos/plugin-twitter": "^0.1.7",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "sharp": "^0.33.0",
+    "canvas": "^2.11.2",
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
