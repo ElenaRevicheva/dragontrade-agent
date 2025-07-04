@@ -1,5 +1,6 @@
 import * as elizaCore from '@elizaos/core';
 import * as twitterPlugin from '@elizaos/plugin-twitter';
+import { TwitterApi } from 'twitter-api-v2';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
@@ -20,6 +21,96 @@ process.env.TWITTER_SPACES_ENABLE = 'false';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Manual Twitter Client Class
+class ManualTwitterClient {
+  constructor() {
+    this.client = new TwitterApi({
+      appKey: process.env.TWITTER_API_KEY,
+      appSecret: process.env.TWITTER_API_SECRET,
+      accessToken: process.env.TWITTER_ACCESS_TOKEN,
+      accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+    });
+    this.isActive = false;
+    this.postInterval = null;
+    console.log('🐦 Manual Twitter client created');
+  }
+
+  async initialize() {
+    try {
+      // Test the connection
+      const user = await this.client.v2.me();
+      console.log('✅ Twitter client connected as:', user.data.username);
+      this.isActive = true;
+      this.startPosting();
+      return true;
+    } catch (error) {
+      console.error('❌ Twitter client initialization failed:', error.message);
+      this.isActive = false;
+      return false;
+    }
+  }
+
+  startPosting() {
+    const minInterval = parseInt(process.env.POST_INTERVAL_MIN) * 60 * 1000; // 90 minutes
+    const maxInterval = parseInt(process.env.POST_INTERVAL_MAX) * 60 * 1000; // 180 minutes
+    
+    const schedulePost = () => {
+      const randomInterval = Math.random() * (maxInterval - minInterval) + minInterval;
+      console.log(`📅 Next post scheduled in ${Math.round(randomInterval / 60000)} minutes`);
+      
+      this.postInterval = setTimeout(async () => {
+        await this.createPost();
+        schedulePost(); // Schedule the next post
+      }, randomInterval);
+    };
+
+    // Start the posting cycle
+    schedulePost();
+  }
+
+  async createPost() {
+    try {
+      const posts = [
+        "🚀 DeFi markets heating up! $AZ holders get first access to alpha signals at aideazz.xyz 📊",
+        "⚡ Smart money is accumulating while retail sleeps. Are you positioned for the next leg up? 💎",
+        "🔥 Layer 2 tokens showing strength. Time to dig deeper into the fundamentals 🧠 #DeFi",
+        "📈 When others are fearful, be greedy. When others are greedy, be strategic 🎯 $AZ",
+        "🌟 Building in bear markets creates bull market legends. What are you building? 💪",
+        "⚠️ Risk management > profit maximization. Protect your capital first 🛡️",
+        "🎯 Alpha isn't about being first, it's about being right. Quality > speed 💯",
+        "🔍 On-chain data tells the real story. Learn to read between the lines 📊 aideazz.xyz"
+      ];
+
+      const randomPost = posts[Math.floor(Math.random() * posts.length)];
+      
+      console.log('🐦 Posting to Twitter:', randomPost.substring(0, 50) + '...');
+      
+      const tweet = await this.client.v2.tweet(randomPost);
+      
+      console.log('✅ Tweet posted successfully!');
+      console.log('🔗 Tweet ID:', tweet.data.id);
+      
+      return tweet;
+    } catch (error) {
+      console.error('❌ Failed to post tweet:', error.message);
+      return null;
+    }
+  }
+
+  getStatus() {
+    return this.isActive ? 'ACTIVE' : 'INACTIVE';
+  }
+
+  stop() {
+    if (this.postInterval) {
+      clearTimeout(this.postInterval);
+      this.postInterval = null;
+    }
+    this.isActive = false;
+    console.log('🔴 Twitter posting stopped');
+  }
+}
+
 async function main() {
   try {
     console.log('🚀 Starting Fixed Embedding Test...');
@@ -38,10 +129,10 @@ async function main() {
       
       settings: {
         secrets: {
-          TWITTER_USERNAME: process.env.TWITTER_USERNAME,
-          TWITTER_PASSWORD: process.env.TWITTER_PASSWORD,
-          TWITTER_EMAIL: process.env.TWITTER_EMAIL,
-          TWITTER_2FA_SECRET: process.env.TWITTER_2FA_SECRET,
+          TWITTER_API_KEY: process.env.TWITTER_API_KEY,
+          TWITTER_API_SECRET: process.env.TWITTER_API_SECRET,
+          TWITTER_ACCESS_TOKEN: process.env.TWITTER_ACCESS_TOKEN,
+          TWITTER_ACCESS_TOKEN_SECRET: process.env.TWITTER_ACCESS_TOKEN_SECRET,
           POST_IMMEDIATELY: "true",
           ENABLE_ACTION_PROCESSING: "true",
           MAX_ACTIONS_PROCESSING: "10",
@@ -173,6 +264,10 @@ async function main() {
     
     console.log('✅ Plugin loaded');
     
+    // Create manual Twitter client
+    console.log('\n🐦 Creating manual Twitter client...');
+    const manualTwitter = new ManualTwitterClient();
+    
     const runtimeConfig = {
       character: fixedCharacter,
       modelProvider: "anthropic",
@@ -186,10 +281,11 @@ async function main() {
       hasCharacter: !!runtimeConfig.character,
       characterName: runtimeConfig.character.name,
       knowledgeCount: runtimeConfig.character.knowledge.length,
-      hasTwitterSettings: !!runtimeConfig.character.settings?.secrets?.TWITTER_USERNAME,
+      hasTwitterSettings: !!runtimeConfig.character.settings?.secrets?.TWITTER_API_KEY,
       modelProvider: runtimeConfig.modelProvider,
       hasToken: !!runtimeConfig.token,
-      pluginCount: runtimeConfig.plugins.length
+      pluginCount: runtimeConfig.plugins.length,
+      hasManualTwitter: !!manualTwitter
     });
     
     const runtime = new elizaCore.AgentRuntime(runtimeConfig);
@@ -205,50 +301,58 @@ async function main() {
       throw initError;
     }
     
+    // Initialize manual Twitter client
+    console.log('\n🐦 Initializing manual Twitter client...');
+    const twitterSuccess = await manualTwitter.initialize();
+    
     console.log('\n🔍 Twitter Client Check:');
     console.log('- Runtime has clients:', !!runtime.clients);
     console.log('- Clients type:', typeof runtime.clients);
+    console.log('- Manual Twitter active:', manualTwitter.isActive);
     
     if (runtime.clients) {
       console.log('- Available clients:', Object.keys(runtime.clients));
       if (runtime.clients.twitter) {
-        console.log('🎉 TWITTER CLIENT IS ACTIVE!');
+        console.log('🎉 ELIZAOS TWITTER CLIENT IS ACTIVE!');
         console.log('- Type:', typeof runtime.clients.twitter);
         console.log('- Constructor:', runtime.clients.twitter.constructor?.name);
-      } else {
-        console.log('❌ Twitter client not found');
       }
-    } else {
-      console.log('❌ No clients object found');
     }
     
     console.log('\n🎯 FINAL STATUS:');
     console.log('═══════════════════════════════════════');
-    console.log('🐦 Twitter Status:', runtime.clients?.twitter ? 'ACTIVE ✅' : 'INACTIVE ❌');
+    console.log('🐦 ElizaOS Twitter:', runtime.clients?.twitter ? 'ACTIVE ✅' : 'INACTIVE ❌');
+    console.log('🐦 Manual Twitter:', manualTwitter.getStatus(), manualTwitter.isActive ? '✅' : '❌');
     console.log('📱 Account: @reviceva');
     console.log('🏷️ Branding: aideazz.xyz and $AZ');
     console.log('⏰ Posting: Every 90-180 minutes');
     console.log('🧠 Knowledge: Disabled (to avoid embedding crashes)');
     console.log('═══════════════════════════════════════');
     
-    if (runtime.clients?.twitter) {
-      console.log('\n🎉 SUCCESS! Your DragonTrade agent is LIVE!');
+    if (manualTwitter.isActive) {
+      console.log('\n🎉 SUCCESS! Your DragonTrade agent is LIVE with manual Twitter!');
+      console.log('🐦 Twitter client is active and will start posting within 90-180 minutes!');
+    } else if (runtime.clients?.twitter) {
+      console.log('\n🎉 SUCCESS! Your DragonTrade agent is LIVE with ElizaOS Twitter!');
       console.log('Twitter client is active and will start posting within 90-180 minutes!');
     } else {
-      console.log('\n⚠️ Twitter client not visible, but agent is running stable');
-      console.log('ElizaOS may handle posting internally even without visible client object');
+      console.log('\n⚠️ Twitter client not active, but agent is running');
     }
     
     // Monitor for activity
     let minutes = 0;
     setInterval(() => {
       minutes++;
-      const twitterStatus = runtime.clients?.twitter ? 'ACTIVE' : 'INACTIVE';
-      console.log(`[${new Date().toISOString()}] 🐉 DragonTrade: ${minutes}min | Twitter: ${twitterStatus}`);
+      const elizaTwitterStatus = runtime.clients?.twitter ? 'ACTIVE' : 'INACTIVE';
+      const manualTwitterStatus = manualTwitter.getStatus();
+      const overallStatus = (elizaTwitterStatus === 'ACTIVE' || manualTwitterStatus === 'ACTIVE') ? 'ACTIVE' : 'INACTIVE';
+      
+      console.log(`[${new Date().toISOString()}] 🐉 DragonTrade: ${minutes}min | Twitter: ${overallStatus}`);
       
       if (minutes % 30 === 0) {
         console.log(`\n📊 Status Update: ${minutes} minutes running`);
-        console.log(`   🐦 Twitter: ${twitterStatus}`);
+        console.log(`   🐦 ElizaOS Twitter: ${elizaTwitterStatus}`);
+        console.log(`   🐦 Manual Twitter: ${manualTwitterStatus}`);
         console.log(`   💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
         console.log(`   🗄️  DB entries: ${runtime.databaseAdapter?.data?.size || 0}`);
         
@@ -260,13 +364,23 @@ async function main() {
       }
     }, 60000);
     
+    // Graceful shutdown
+    process.on('SIGINT', () => {
+      console.log('\n🔴 Shutting down gracefully...');
+      manualTwitter.stop();
+      process.exit(0);
+    });
+    
   } catch (error) {
     console.error('\n💥 FATAL ERROR:');
     console.error('Message:', error.message);
     console.error('Stack:', error.stack);
     console.error('\nEnvironment check:');
     console.error('- ANTHROPIC_API_KEY:', !!process.env.ANTHROPIC_API_KEY);
-    console.error('- TWITTER_USERNAME:', !!process.env.TWITTER_USERNAME);
+    console.error('- TWITTER_API_KEY:', !!process.env.TWITTER_API_KEY);
+    console.error('- TWITTER_API_SECRET:', !!process.env.TWITTER_API_SECRET);
+    console.error('- TWITTER_ACCESS_TOKEN:', !!process.env.TWITTER_ACCESS_TOKEN);
+    console.error('- TWITTER_ACCESS_TOKEN_SECRET:', !!process.env.TWITTER_ACCESS_TOKEN_SECRET);
     process.exit(1);
   }
 }
