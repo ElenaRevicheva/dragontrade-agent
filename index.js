@@ -8,6 +8,34 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// 🔍 DEBUG: Comprehensive Environment Variables Check
+console.log('🔍 DEBUG: Starting Environment Variables Check...');
+console.log('═══════════════════════════════════════');
+console.log('TWITTER_API_KEY:', process.env.TWITTER_API_KEY ? `SET (length: ${process.env.TWITTER_API_KEY.length})` : '❌ NOT SET');
+console.log('TWITTER_API_SECRET:', process.env.TWITTER_API_SECRET ? `SET (length: ${process.env.TWITTER_API_SECRET.length})` : '❌ NOT SET');
+console.log('TWITTER_ACCESS_TOKEN:', process.env.TWITTER_ACCESS_TOKEN ? `SET (length: ${process.env.TWITTER_ACCESS_TOKEN.length})` : '❌ NOT SET');
+console.log('TWITTER_ACCESS_TOKEN_SECRET:', process.env.TWITTER_ACCESS_TOKEN_SECRET ? `SET (length: ${process.env.TWITTER_ACCESS_TOKEN_SECRET.length})` : '❌ NOT SET');
+console.log('ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? `SET (length: ${process.env.ANTHROPIC_API_KEY.length})` : '❌ NOT SET');
+
+// Check alternative names
+console.log('\n🔍 Checking Alternative Variable Names:');
+console.log('TWITTER_CONSUMER_KEY:', process.env.TWITTER_CONSUMER_KEY ? `SET (length: ${process.env.TWITTER_CONSUMER_KEY.length})` : '❌ NOT SET');
+console.log('TWITTER_CONSUMER_SECRET:', process.env.TWITTER_CONSUMER_SECRET ? `SET (length: ${process.env.TWITTER_CONSUMER_SECRET.length})` : '❌ NOT SET');
+console.log('TWITTER_BEARER_TOKEN:', process.env.TWITTER_BEARER_TOKEN ? `SET (length: ${process.env.TWITTER_BEARER_TOKEN.length})` : '❌ NOT SET');
+console.log('TWITTER_USERNAME:', process.env.TWITTER_USERNAME ? `SET: ${process.env.TWITTER_USERNAME}` : '❌ NOT SET');
+
+// Show first/last few characters for verification (safe for logs)
+if (process.env.TWITTER_API_KEY) {
+  const key = process.env.TWITTER_API_KEY;
+  console.log(`TWITTER_API_KEY preview: ${key.substring(0, 8)}...${key.substring(key.length - 4)}`);
+}
+if (process.env.TWITTER_ACCESS_TOKEN) {
+  const token = process.env.TWITTER_ACCESS_TOKEN;
+  console.log(`TWITTER_ACCESS_TOKEN preview: ${token.substring(0, 8)}...${token.substring(token.length - 4)}`);
+}
+
+console.log('═══════════════════════════════════════\n');
+
 // Force all required environment variables
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
@@ -21,30 +49,84 @@ process.env.TWITTER_SPACES_ENABLE = 'false';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Manual Twitter Client Class
+// Manual Twitter Client Class with Enhanced Debugging
 class ManualTwitterClient {
   constructor() {
-    this.client = new TwitterApi({
-      appKey: process.env.TWITTER_API_KEY,
-      appSecret: process.env.TWITTER_API_SECRET,
-      accessToken: process.env.TWITTER_ACCESS_TOKEN,
-      accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
-    });
-    this.isActive = false;
-    this.postInterval = null;
-    console.log('🐦 Manual Twitter client created');
+    console.log('🐦 Creating Manual Twitter Client...');
+    
+    // Use primary or fallback credentials
+    const apiKey = process.env.TWITTER_API_KEY || process.env.TWITTER_CONSUMER_KEY;
+    const apiSecret = process.env.TWITTER_API_SECRET || process.env.TWITTER_CONSUMER_SECRET;
+    const accessToken = process.env.TWITTER_ACCESS_TOKEN;
+    const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET;
+    
+    console.log('🔑 Using credentials:');
+    console.log('- API Key:', apiKey ? '✅ Found' : '❌ Missing');
+    console.log('- API Secret:', apiSecret ? '✅ Found' : '❌ Missing');
+    console.log('- Access Token:', accessToken ? '✅ Found' : '❌ Missing');
+    console.log('- Access Secret:', accessSecret ? '✅ Found' : '❌ Missing');
+    
+    if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
+      console.error('❌ Missing required Twitter credentials!');
+      console.error('Required variables: TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET');
+      this.isActive = false;
+      this.postInterval = null;
+      return;
+    }
+    
+    try {
+      this.client = new TwitterApi({
+        appKey: apiKey,
+        appSecret: apiSecret,
+        accessToken: accessToken,
+        accessSecret: accessSecret,
+      });
+      this.isActive = false;
+      this.postInterval = null;
+      console.log('🐦 Manual Twitter client created successfully');
+    } catch (error) {
+      console.error('❌ Failed to create Twitter client:', error.message);
+      this.isActive = false;
+      this.postInterval = null;
+    }
   }
 
   async initialize() {
+    if (!this.client) {
+      console.error('❌ Twitter client not created - missing credentials');
+      return false;
+    }
+    
     try {
+      console.log('🔍 Testing Twitter API connection...');
+      
       // Test the connection
       const user = await this.client.v2.me();
-      console.log('✅ Twitter client connected as:', user.data.username);
+      console.log('✅ Twitter client connected successfully!');
+      console.log('📱 Connected as:', user.data.username);
+      console.log('👤 Display name:', user.data.name);
+      console.log('🆔 User ID:', user.data.id);
+      
       this.isActive = true;
       this.startPosting();
       return true;
     } catch (error) {
-      console.error('❌ Twitter client initialization failed:', error.message);
+      console.error('❌ Twitter client initialization failed!');
+      console.error('Error code:', error.code || 'Unknown');
+      console.error('Error message:', error.message);
+      
+      if (error.code === 401) {
+        console.error('🔧 401 Error Solutions:');
+        console.error('1. Check if API keys are correct in Railway Variables');
+        console.error('2. Verify app has "Read and Write" permissions');
+        console.error('3. Try regenerating Access Token and Secret');
+        console.error('4. Make sure no extra spaces in variable values');
+      } else if (error.code === 403) {
+        console.error('🔧 403 Error Solutions:');
+        console.error('1. App may not have posting permissions');
+        console.error('2. Check app permissions in Twitter Developer Portal');
+      }
+      
       this.isActive = false;
       return false;
     }
@@ -56,7 +138,8 @@ class ManualTwitterClient {
     
     const schedulePost = () => {
       const randomInterval = Math.random() * (maxInterval - minInterval) + minInterval;
-      console.log(`📅 Next post scheduled in ${Math.round(randomInterval / 60000)} minutes`);
+      const minutesUntilPost = Math.round(randomInterval / 60000);
+      console.log(`📅 Next post scheduled in ${minutesUntilPost} minutes`);
       
       this.postInterval = setTimeout(async () => {
         await this.createPost();
@@ -78,21 +161,27 @@ class ManualTwitterClient {
         "🌟 Building in bear markets creates bull market legends. What are you building? 💪",
         "⚠️ Risk management > profit maximization. Protect your capital first 🛡️",
         "🎯 Alpha isn't about being first, it's about being right. Quality > speed 💯",
-        "🔍 On-chain data tells the real story. Learn to read between the lines 📊 aideazz.xyz"
+        "🔍 On-chain data tells the real story. Learn to read between the lines 📊 aideazz.xyz",
+        "💡 The best opportunities come disguised as problems. What problem are you solving? 🔥",
+        "🎪 Market volatility = opportunity for those who stay disciplined 📈 $AZ alpha at aideazz.xyz"
       ];
 
       const randomPost = posts[Math.floor(Math.random() * posts.length)];
       
-      console.log('🐦 Posting to Twitter:', randomPost.substring(0, 50) + '...');
+      console.log('🐦 Attempting to post to Twitter...');
+      console.log('📝 Content:', randomPost.substring(0, 50) + '...');
       
       const tweet = await this.client.v2.tweet(randomPost);
       
       console.log('✅ Tweet posted successfully!');
       console.log('🔗 Tweet ID:', tweet.data.id);
+      console.log('📊 Tweet text length:', randomPost.length);
       
       return tweet;
     } catch (error) {
-      console.error('❌ Failed to post tweet:', error.message);
+      console.error('❌ Failed to post tweet!');
+      console.error('Error code:', error.code || 'Unknown');
+      console.error('Error message:', error.message);
       return null;
     }
   }
@@ -113,8 +202,10 @@ class ManualTwitterClient {
 
 async function main() {
   try {
-    console.log('🚀 Starting Fixed Embedding Test...');
+    console.log('🚀 Starting DragonTrade Agent...');
     console.log('⏰ Time:', new Date().toISOString());
+    console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
+    console.log('📂 Working Directory:', process.cwd());
     
     console.log('\n📋 Loading character with empty knowledge...');
     const characterPath = resolve(__dirname, 'character.json');
@@ -235,15 +326,11 @@ async function main() {
       
       // ⭐ FIXED: Safe embedding methods that handle any input type
       async getCachedEmbeddings(text) { 
-        console.log('🔍 getCachedEmbeddings called with:', typeof text, text);
-        
         // Always return null to skip caching and avoid crashes
         return null;
       }
       
       async setCachedEmbeddings(text, embeddings) { 
-        console.log('💾 setCachedEmbeddings called with:', typeof text, typeof embeddings);
-        
         // Always return true to indicate success but don't actually cache
         return true; 
       }
@@ -337,6 +424,7 @@ async function main() {
       console.log('Twitter client is active and will start posting within 90-180 minutes!');
     } else {
       console.log('\n⚠️ Twitter client not active, but agent is running');
+      console.log('🔧 Check the debug output above for missing environment variables');
     }
     
     // Monitor for activity
@@ -385,7 +473,7 @@ async function main() {
   }
 }
 
-console.log('🌟 Starting Fixed Embedding Test...');
+console.log('🌟 Starting DragonTrade Agent with Full Debugging...');
 main().catch(err => {
   console.error('💥 Main failed:', err.message);
   process.exit(1);
