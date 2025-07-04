@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Force Twitter environment variables
+// Force all required environment variables
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
@@ -22,201 +22,337 @@ const __dirname = dirname(__filename);
 
 async function main() {
   try {
-    console.log('🚀 Starting Manual Twitter Client Test...');
+    console.log('🚀 Starting Client Creation Trigger Test...');
     console.log('⏰ Time:', new Date().toISOString());
     
-    // Credential check
-    console.log('\n🔐 Credentials:');
-    console.log('ANTHROPIC_API_KEY:', !!process.env.ANTHROPIC_API_KEY ? '✅' : '❌');
-    console.log('TWITTER_USERNAME:', !!process.env.TWITTER_USERNAME ? '✅' : '❌');
-    console.log('TWITTER_PASSWORD:', !!process.env.TWITTER_PASSWORD ? '✅' : '❌');
-    console.log('TWITTER_EMAIL:', !!process.env.TWITTER_EMAIL ? '✅' : '❌');
-    console.log('TWITTER_2FA_SECRET:', !!process.env.TWITTER_2FA_SECRET ? '✅' : '❌');
+    // Load the original character structure from your file
+    console.log('\n📋 Loading original character from file...');
+    const characterPath = resolve(__dirname, 'character.json');
+    const originalCharacter = JSON.parse(fs.readFileSync(characterPath, 'utf8'));
     
-    // Explore ElizaOS structure to find client classes
-    console.log('\n🔍 ElizaOS Structure Analysis:');
-    console.log('Available ElizaCore exports:', Object.keys(elizaCore).filter(key => key.includes('Client') || key.includes('Twitter')));
-    console.log('Available in Clients enum:', elizaCore.Clients ? Object.keys(elizaCore.Clients) : 'No Clients enum');
-    
-    // Check if there's a direct Twitter client class
-    console.log('\n🐦 Twitter Plugin Analysis:');
-    console.log('Twitter plugin type:', typeof twitterPlugin);
-    console.log('Twitter plugin keys:', Object.keys(twitterPlugin));
-    console.log('Default export:', twitterPlugin.default ? typeof twitterPlugin.default : 'none');
-    console.log('TwitterPlugin export:', twitterPlugin.twitterPlugin ? typeof twitterPlugin.twitterPlugin : 'none');
-    
-    // Try to find Twitter client class in different places
-    let TwitterClientClass = null;
-    
-    // Method 1: Look for TwitterClient in ElizaCore
-    if (elizaCore.TwitterClient) {
-      TwitterClientClass = elizaCore.TwitterClient;
-      console.log('✅ Found TwitterClient in elizaCore');
-    }
-    // Method 2: Look in Clients enum
-    else if (elizaCore.Clients && elizaCore.Clients.TWITTER) {
-      TwitterClientClass = elizaCore.Clients.TWITTER;
-      console.log('✅ Found Twitter in Clients enum');
-    }
-    // Method 3: Look in twitter plugin
-    else if (twitterPlugin.TwitterClient) {
-      TwitterClientClass = twitterPlugin.TwitterClient;
-      console.log('✅ Found TwitterClient in plugin');
-    }
-    else {
-      console.log('❌ No TwitterClient class found');
-    }
-    
-    // Minimal character
-    const character = {
-      name: "Algom",
-      clients: ["twitter"],
+    // Create character that exactly matches what worked on Fleek
+    const fleekyCharacter = {
+      ...originalCharacter,
+      clients: ["twitter"], // Ensure Twitter is specified
       modelProvider: "anthropic",
-      bio: ["🐉 DragonTrade - AI Trading Assistant"],
-      knowledge: [],
-      postExamples: [
-        "🐉 CRYPTO ALERT: Market movement detected! 📈 | aideazz.xyz",
-        "⚡️ DeFi UPDATE: Opportunities emerging! 🔥 | $AZ", 
-        "📊 MARKET PULSE: Trends looking strong! | Powered by $AZ"
-      ],
-      style: { all: ["Professional"], post: ["Concise"] },
-      topics: ["Cryptocurrency"],
-      adjectives: ["Strategic"]
+      
+      // Add the settings structure that was in your original config
+      settings: {
+        secrets: {
+          TWITTER_USERNAME: process.env.TWITTER_USERNAME,
+          TWITTER_PASSWORD: process.env.TWITTER_PASSWORD,
+          TWITTER_EMAIL: process.env.TWITTER_EMAIL,
+          TWITTER_2FA_SECRET: process.env.TWITTER_2FA_SECRET,
+          POST_IMMEDIATELY: "true",
+          ENABLE_ACTION_PROCESSING: "true",
+          MAX_ACTIONS_PROCESSING: "10",
+          POST_INTERVAL_MAX: "180",
+          POST_INTERVAL_MIN: "90",
+          TWITTER_SPACES_ENABLE: "false",
+          ACTION_TIMELINE_TYPE: "foryou",
+          TWITTER_POLL_INTERVAL: "120"
+        },
+        voice: {
+          model: "en_US-neural-medium"
+        }
+      }
     };
     
-    // Simple database adapter
-    class SimpleAdapter extends elizaCore.DatabaseAdapter {
+    console.log('✅ Fleek-style character configured');
+    console.log('- Character name:', fleekyCharacter.name);
+    console.log('- Clients:', fleekyCharacter.clients);
+    console.log('- Has settings.secrets:', !!fleekyCharacter.settings?.secrets);
+    console.log('- Twitter credentials in settings:', !!fleekyCharacter.settings?.secrets?.TWITTER_USERNAME);
+    
+    // Complete database adapter
+    class CompleteAdapter extends elizaCore.DatabaseAdapter {
       constructor() {
         super();
         this.data = new Map();
+        console.log('🗄️ Complete database adapter initialized');
       }
       
-      async getMemoryById() { return null; }
-      async getMemories() { return []; }
-      async createMemory(memory) { return { ...memory, id: Date.now().toString() }; }
-      async removeMemory() { return true; }
-      async getRelationships() { return []; }
-      async createRelationship(rel) { return { ...rel, id: Date.now().toString() }; }
-      async getGoals() { return []; }
-      async createGoal(goal) { return { ...goal, id: Date.now().toString() }; }
-      async updateGoal(goal) { return goal; }
-      async removeGoal() { return true; }
-      async getRoom() { return null; }
-      async createRoom(room) { return { ...room, id: Date.now().toString() }; }
-      async getParticipantsForAccount() { return []; }
-      async getParticipantUserState() { return null; }
-      async setParticipantUserState(roomId, userId, state) { return state; }
-      async addParticipant(userId, roomId) { 
-        console.log('✅ Added participant');
-        return { userId, roomId, id: Date.now().toString() }; 
+      async getMemoryById(id) { return this.data.get(`memory_${id}`) || null; }
+      async getMemories(params = {}) { 
+        const memories = Array.from(this.data.values()).filter(item => item.type === 'memory');
+        if (params.roomId) return memories.filter(m => m.roomId === params.roomId);
+        if (params.count) return memories.slice(0, params.count);
+        return memories;
       }
-      async removeParticipant() { return true; }
-      async getAccountById() { return null; }
-      async createAccount(account) { return account; }
-      async getCachedEmbeddings() { return null; }
-      async setCachedEmbeddings() { return true; }
-      async searchMemoriesByEmbedding() { return []; }
-      async log(params) { 
-        console.log('📝', typeof params === 'string' ? params : JSON.stringify(params));
+      async createMemory(memory) { 
+        const id = memory.id || Date.now().toString();
+        const mem = { ...memory, id, type: 'memory', createdAt: Date.now() };
+        this.data.set(`memory_${id}`, mem);
+        return mem;
+      }
+      async removeMemory(id) { return this.data.delete(`memory_${id}`); }
+      async updateMemory(memory) {
+        if (this.data.has(`memory_${memory.id}`)) {
+          this.data.set(`memory_${memory.id}`, { ...memory, type: 'memory' });
+          return memory;
+        }
+        return null;
+      }
+      
+      async getRelationships(params = {}) { return Array.from(this.data.values()).filter(item => item.type === 'relationship'); }
+      async createRelationship(rel) { 
+        const id = rel.id || Date.now().toString();
+        const relationship = { ...rel, id, type: 'relationship' };
+        this.data.set(`rel_${id}`, relationship);
+        return relationship;
+      }
+      async getRelationship(params) {
+        const relationships = await this.getRelationships();
+        return relationships.find(r => 
+          (r.userId1 === params.userId1 && r.userId2 === params.userId2) ||
+          (r.userId1 === params.userId2 && r.userId2 === params.userId1)
+        ) || null;
+      }
+      
+      async getGoals(params = {}) { 
+        const goals = Array.from(this.data.values()).filter(item => item.type === 'goal');
+        if (params.userId) return goals.filter(g => g.userId === params.userId);
+        if (params.roomId) return goals.filter(g => g.roomId === params.roomId);
+        if (params.onlyInProgress) return goals.filter(g => g.status === 'IN_PROGRESS');
+        if (params.count) return goals.slice(0, params.count);
+        return goals;
+      }
+      async createGoal(goal) { 
+        const id = goal.id || Date.now().toString();
+        const g = { ...goal, id, type: 'goal', status: goal.status || 'IN_PROGRESS' };
+        this.data.set(`goal_${id}`, g);
+        return g;
+      }
+      async updateGoal(goal) { 
+        this.data.set(`goal_${goal.id}`, { ...goal, type: 'goal' });
+        return goal;
+      }
+      async removeGoal(id) { return this.data.delete(`goal_${id}`); }
+      
+      async getRoom(id) { return this.data.get(`room_${id}`) || null; }
+      async createRoom(room) { 
+        const id = room.id || Date.now().toString();
+        const r = { ...room, id, type: 'room' };
+        this.data.set(`room_${id}`, r);
+        return r;
+      }
+      async removeRoom(id) { return this.data.delete(`room_${id}`); }
+      
+      async getParticipantsForAccount(userId) { 
+        return Array.from(this.data.values()).filter(item => 
+          item.type === 'participant' && item.userId === userId
+        );
+      }
+      async getParticipantsForRoom(roomId) {
+        return Array.from(this.data.values()).filter(item => 
+          item.type === 'participant' && item.roomId === roomId
+        );
+      }
+      async getParticipantUserState(roomId, userId) { 
+        return this.data.get(`participant_${roomId}_${userId}`) || null; 
+      }
+      async setParticipantUserState(roomId, userId, state) { 
+        const participantState = { 
+          roomId, userId, ...state, type: 'participant', updatedAt: Date.now()
+        };
+        this.data.set(`participant_${roomId}_${userId}`, participantState);
+        return participantState;
+      }
+      async addParticipant(userId, roomId) {
+        const participant = {
+          userId, roomId, id: `${userId}_${roomId}`, type: 'participant', joinedAt: Date.now()
+        };
+        this.data.set(`participant_${roomId}_${userId}`, participant);
+        console.log('✅ Added participant:', userId, 'to room:', roomId);
+        return participant;
+      }
+      async removeParticipant(userId, roomId) {
+        const removed = this.data.delete(`participant_${roomId}_${userId}`);
+        console.log('🗑️ Removed participant:', userId, 'from room:', roomId);
+        return removed;
+      }
+      
+      async getAccountById(userId) { return this.data.get(`account_${userId}`) || null; }
+      async createAccount(account) { 
+        const id = account.id || account.userId || Date.now().toString();
+        const acc = { ...account, id, type: 'account' };
+        this.data.set(`account_${id}`, acc);
+        return acc; 
+      }
+      async updateAccount(account) {
+        if (account.id) {
+          this.data.set(`account_${account.id}`, { ...account, type: 'account' });
+          return account;
+        }
+        return null;
+      }
+      
+      async getCachedEmbeddings(text) { 
+        if (!text) return null;
+        const cached = this.data.get(`embedding_${text.slice(0, 50)}`);
+        return cached ? cached.embeddings : null;
+      }
+      async setCachedEmbeddings(text, embeddings) { 
+        if (!text || !embeddings) return false;
+        const key = `embedding_${text.slice(0, 50)}`;
+        this.data.set(key, { 
+          text: text.slice(0, 100), embeddings, type: 'embedding', createdAt: Date.now() 
+        });
         return true; 
       }
-    }
-    
-    console.log('\n🤖 Creating AgentRuntime...');
-    
-    const config = {
-      character: character,
-      modelProvider: "anthropic",
-      token: process.env.ANTHROPIC_API_KEY,
-      databaseAdapter: new SimpleAdapter(),
-      plugins: [twitterPlugin.default || twitterPlugin]
-    };
-    
-    const runtime = new elizaCore.AgentRuntime(config);
-    console.log('✅ AgentRuntime created');
-    
-    console.log('\n🔄 Initializing runtime...');
-    await runtime.initialize();
-    console.log('✅ Runtime initialized');
-    
-    console.log('\n🔍 Runtime Analysis:');
-    console.log('- Runtime has clients:', !!runtime.clients);
-    console.log('- Runtime keys:', Object.keys(runtime).filter(key => key.includes('client') || key.includes('Client')));
-    
-    // Try to manually create Twitter client if runtime doesn't have one
-    if (!runtime.clients || !runtime.clients.twitter) {
-      console.log('\n🔧 Attempting manual Twitter client creation...');
       
-      try {
-        if (TwitterClientClass) {
-          console.log('🔄 Creating Twitter client manually...');
-          
-          const twitterConfig = {
-            username: process.env.TWITTER_USERNAME,
-            password: process.env.TWITTER_PASSWORD,
-            email: process.env.TWITTER_EMAIL,
-            twoFactorSecret: process.env.TWITTER_2FA_SECRET,
-            runtime: runtime
-          };
-          
-          const twitterClient = new TwitterClientClass(twitterConfig);
-          console.log('✅ Twitter client created manually');
-          
-          // Try to attach it to runtime
-          if (!runtime.clients) {
-            runtime.clients = {};
-          }
-          runtime.clients.twitter = twitterClient;
-          console.log('✅ Twitter client attached to runtime');
-          
-          // Try to initialize the client
-          if (twitterClient.start) {
-            await twitterClient.start();
-            console.log('✅ Twitter client started');
-          }
-          
-        } else {
-          console.log('❌ Cannot create Twitter client - no class found');
+      async searchMemoriesByEmbedding(embedding, params = {}) { 
+        const memories = await this.getMemories(params);
+        return memories.slice(0, params.count || 5);
+      }
+      async log(params) { 
+        const message = typeof params === 'string' ? params : (params.message || JSON.stringify(params));
+        console.log('📝 DB Log:', message);
+        return true; 
+      }
+      async getActorDetails(params) { return null; }
+      async searchMemories(params) { return await this.getMemories(params); }
+      async countMemories(roomId, unique = true) {
+        const memories = await this.getMemories({ roomId });
+        return memories.length;
+      }
+      async removeAllMemories(roomId) {
+        const memories = await this.getMemories({ roomId });
+        for (const memory of memories) {
+          await this.removeMemory(memory.id);
         }
-      } catch (clientError) {
-        console.error('❌ Manual client creation failed:', clientError.message);
+        return true;
       }
     }
     
-    // Final status check
+    console.log('\n🔌 Loading plugins exactly like Fleek...');
+    const plugins = [
+      twitterPlugin.default || twitterPlugin,
+      // Note: Only Twitter plugin for now to isolate the issue
+    ];
+    
+    console.log('✅ Plugins loaded:', plugins.length);
+    
+    // Create runtime config that matches Fleek setup
+    const runtimeConfig = {
+      character: fleekyCharacter,
+      modelProvider: "anthropic",
+      token: process.env.ANTHROPIC_API_KEY,
+      databaseAdapter: new CompleteAdapter(),
+      plugins: plugins
+    };
+    
+    console.log('\n🤖 Creating AgentRuntime (Fleek-style)...');
+    console.log('Config verification:', {
+      hasCharacter: !!runtimeConfig.character,
+      characterName: runtimeConfig.character.name,
+      characterClients: runtimeConfig.character.clients,
+      hasSettings: !!runtimeConfig.character.settings,
+      hasSecrets: !!runtimeConfig.character.settings?.secrets,
+      hasTwitterCreds: !!runtimeConfig.character.settings?.secrets?.TWITTER_USERNAME,
+      modelProvider: runtimeConfig.modelProvider,
+      hasToken: !!runtimeConfig.token,
+      hasDatabase: !!runtimeConfig.databaseAdapter,
+      pluginCount: runtimeConfig.plugins.length
+    });
+    
+    const runtime = new elizaCore.AgentRuntime(runtimeConfig);
+    console.log('✅ AgentRuntime created');
+    
+    console.log('\n🔄 Initializing runtime (with client creation trigger)...');
+    await runtime.initialize();
+    console.log('✅ Runtime initialization completed');
+    
+    // Enhanced client detection
+    console.log('\n🔍 Post-Initialization Analysis:');
+    console.log('- Runtime has clients property:', !!runtime.clients);
+    console.log('- Runtime clients type:', typeof runtime.clients);
+    console.log('- Runtime clients is array:', Array.isArray(runtime.clients));
+    
+    if (runtime.clients) {
+      if (typeof runtime.clients === 'object' && !Array.isArray(runtime.clients)) {
+        console.log('- Available client keys:', Object.keys(runtime.clients));
+        console.log('- Twitter client exists:', !!runtime.clients.twitter);
+        
+        if (runtime.clients.twitter) {
+          console.log('🎉 TWITTER CLIENT FOUND!');
+          console.log('- Type:', typeof runtime.clients.twitter);
+          console.log('- Constructor:', runtime.clients.twitter.constructor?.name);
+          console.log('- Has start method:', typeof runtime.clients.twitter.start);
+          console.log('- Has stop method:', typeof runtime.clients.twitter.stop);
+        }
+      } else {
+        console.log('- Clients structure:', runtime.clients);
+      }
+    } else {
+      console.log('❌ Still no clients object');
+    }
+    
+    // Try to trigger client creation manually if still missing
+    if (!runtime.clients?.twitter) {
+      console.log('\n🔧 Attempting to trigger client creation...');
+      
+      try {
+        // Try to call a method that might trigger client creation
+        if (runtime.registerClient) {
+          console.log('🔄 Trying runtime.registerClient...');
+          await runtime.registerClient('twitter');
+        }
+        
+        if (runtime.startClients) {
+          console.log('🔄 Trying runtime.startClients...');
+          await runtime.startClients();
+        }
+        
+        if (runtime.initializeClients) {
+          console.log('🔄 Trying runtime.initializeClients...');
+          await runtime.initializeClients();
+        }
+        
+        // Check again after manual triggers
+        if (runtime.clients?.twitter) {
+          console.log('✅ Manual trigger successful!');
+        }
+        
+      } catch (triggerError) {
+        console.log('⚠️ Manual trigger failed:', triggerError.message);
+      }
+    }
+    
     console.log('\n🎯 FINAL STATUS:');
     console.log('═══════════════════════════════════════');
     console.log('🐦 Twitter Status:', runtime.clients?.twitter ? 'ACTIVE ✅' : 'INACTIVE ❌');
     console.log('📱 Account: @reviceva');
-    console.log('⏰ Expected posting: 90-180 minutes');
+    console.log('🏷️ Branding: aideazz.xyz and $AZ');
+    console.log('⏰ Posting: Every 90-180 minutes');
     console.log('═══════════════════════════════════════');
     
     if (runtime.clients?.twitter) {
-      console.log('\n🎉 SUCCESS! Twitter client is now active!');
-      console.log('- Client type:', typeof runtime.clients.twitter);
-      console.log('- Constructor:', runtime.clients.twitter.constructor?.name);
+      console.log('\n🎉 SUCCESS! Twitter client is ACTIVE!');
+      console.log('Your DragonTrade agent will start posting within 90-180 minutes!');
     } else {
       console.log('\n❌ Twitter client still inactive');
-      console.log('- This might be a limitation of the current ElizaOS version');
-      console.log('- Or the Twitter plugin may need different initialization');
+      console.log('This may be a version compatibility issue with ElizaOS');
+      console.log('But your agent is running and will attempt to post if the framework allows it');
     }
     
-    // Monitor with enhanced Twitter status
+    // Monitor for posting activity
     let minutes = 0;
     setInterval(() => {
       minutes++;
-      const twitterActive = runtime.clients?.twitter ? 'ACTIVE' : 'INACTIVE';
-      console.log(`[${new Date().toISOString()}] 🐉 Manual Test: ${minutes}min | Twitter: ${twitterActive}`);
+      const twitterStatus = runtime.clients?.twitter ? 'ACTIVE' : 'INACTIVE';
+      console.log(`[${new Date().toISOString()}] 🐉 DragonTrade: ${minutes}min | Twitter: ${twitterStatus}`);
       
       if (minutes % 30 === 0) {
-        console.log(`📊 Status Check: ${minutes} minutes running`);
-        console.log(`   🐦 Twitter: ${twitterActive}`);
+        console.log(`\n📊 Status Update: ${minutes} minutes running`);
+        console.log(`   🐦 Twitter: ${twitterStatus}`);
         console.log(`   💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+        console.log(`   🗄️  DB entries: ${runtime.databaseAdapter?.data?.size || 0}`);
         
         if (runtime.clients?.twitter) {
-          console.log(`   🔥 Twitter client active - posting should begin soon!`);
+          console.log(`   🔥 Twitter client active - posting window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} min`);
         } else {
-          console.log(`   ⚠️  Twitter client still inactive after ${minutes} minutes`);
+          console.log(`   ⚠️  Client inactive but runtime stable for ${minutes} minutes`);
         }
       }
     }, 60000);
@@ -225,21 +361,11 @@ async function main() {
     console.error('\n💥 FATAL ERROR:');
     console.error('Message:', error.message);
     console.error('Stack:', error.stack);
-    
-    console.error('\n🔍 Debug Info:');
-    console.error('- ElizaCore available:', !!elizaCore);
-    console.error('- AgentRuntime available:', !!elizaCore.AgentRuntime);
-    console.error('- TwitterPlugin available:', !!twitterPlugin);
-    console.error('- Environment vars set:', {
-      ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
-      TWITTER_USERNAME: !!process.env.TWITTER_USERNAME
-    });
-    
     process.exit(1);
   }
 }
 
-console.log('🌟 Starting Manual Twitter Client Test...');
+console.log('🌟 Starting Client Creation Trigger Test...');
 main().catch(err => {
   console.error('💥 Main failed:', err.message);
   process.exit(1);
