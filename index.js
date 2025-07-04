@@ -16,56 +16,58 @@ const characterPath = resolve(__dirname, 'character.json');
 
 async function main() {
   try {
-    console.log('🚀 Starting DragonTrade Agent (Minimal Mode)...');
+    console.log('🚀 Starting DragonTrade Agent (Twitter Debug Mode)...');
     console.log('⏰ Time:', new Date().toISOString());
     
-    // Check essential environment variables
-    const requiredEnvVars = {
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    // Enhanced Twitter credential check
+    console.log('\n🔐 Twitter Credentials Check:');
+    const twitterCreds = {
       TWITTER_USERNAME: process.env.TWITTER_USERNAME,
       TWITTER_PASSWORD: process.env.TWITTER_PASSWORD,
-      TWITTER_EMAIL: process.env.TWITTER_EMAIL
+      TWITTER_EMAIL: process.env.TWITTER_EMAIL,
+      TWITTER_2FA_SECRET: process.env.TWITTER_2FA_SECRET
     };
     
-    console.log('\n🔐 Environment Check:');
-    for (const [key, value] of Object.entries(requiredEnvVars)) {
+    for (const [key, value] of Object.entries(twitterCreds)) {
       console.log(`${key}: ${value ? '✅ SET' : '❌ MISSING'}`);
+      if (!value) {
+        throw new Error(`Missing Twitter credential: ${key}`);
+      }
     }
     
-    // Determine which API to use
+    // Check API keys
+    console.log('\n🔑 API Keys Check:');
     const useOpenAI = !process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY;
     const modelProvider = useOpenAI ? 'openai' : 'anthropic';
     const apiKey = useOpenAI ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
     
-    console.log(`🤖 Model Provider: ${modelProvider.toUpperCase()}`);
-    console.log(`🔑 API Key: ${apiKey ? 'SET' : 'MISSING'}`);
+    console.log(`Model Provider: ${modelProvider.toUpperCase()}`);
+    console.log(`API Key: ${apiKey ? 'SET' : 'MISSING'}`);
     
     if (!apiKey) {
       throw new Error('No valid API key found');
     }
     
-    // Load and simplify character to avoid knowledge processing issues
+    // Load character
     console.log('\n📋 Loading character...');
     const originalCharacter = JSON.parse(fs.readFileSync(characterPath, 'utf8'));
     
-    // Create ultra-minimal character with NO knowledge processing
-    const minimalCharacter = {
+    // Create character optimized for Twitter posting
+    const twitterOptimizedCharacter = {
       name: originalCharacter.name,
-      clients: ['twitter'],
+      clients: ['twitter'], // Explicitly specify Twitter
       modelProvider: modelProvider,
       plugins: originalCharacter.plugins,
       
-      // Minimal bio without complex content
       bio: [
         "🐉 DragonTrade - AI Trading Assistant",
-        "Expert crypto market analysis and insights",
-        "Powered by advanced AI for Web3 trading"
+        "Expert crypto market analysis and insights", 
+        "Powered by advanced AI for Web3 trading",
+        "Automated posting every 90-180 minutes"
       ],
       
-      // Remove all complex knowledge that causes embedding issues
-      knowledge: [],
+      knowledge: [], // Keep empty to avoid issues
       
-      // Keep essential message examples
       messageExamples: [
         [
           {
@@ -77,182 +79,203 @@ async function main() {
           {
             "user": "Algom",
             "content": {
-              "text": "🔥 Markets are showing interesting movement! Let me analyze the current trends and provide you with actionable insights. | aideazz.xyz"
+              "text": "🔥 Markets are showing interesting movement! Current analysis shows strong momentum in key altcoins. Let me break down the trends for you. | aideazz.xyz"
             }
           }
         ]
       ],
       
-      // Keep post examples for Twitter posting
-      postExamples: originalCharacter.postExamples,
+      postExamples: originalCharacter.postExamples || [
+        "🐉 CRYPTO ALERT: Major market movement detected! Bitcoin showing strength above key support levels. Watch for breakout! 📈 #Bitcoin | aideazz.xyz",
+        "⚡️ DeFi UPDATE: Yield farming opportunities heating up across multiple chains. Smart money is accumulating! 🔥 #DeFi | $AZ",
+        "📊 MARKET PULSE: Altcoin season indicators flashing green! Time to watch your favorite projects closely. | Powered by $AZ"
+      ],
       
-      // Essential style and topics
       style: {
-        all: ["Analytical", "Professional", "Insightful"],
+        all: ["Analytical", "Professional", "Engaging"],
         chat: ["Helpful", "Detailed", "Strategic"],
-        post: ["Concise", "Informative", "Engaging"]
+        post: ["Concise", "Informative", "Exciting"]
       },
       
       topics: [
         "Cryptocurrency trading",
-        "Market analysis",
+        "Market analysis", 
         "DeFi protocols",
-        "Trading strategies"
+        "Trading strategies",
+        "Web3 trends"
       ],
       
       adjectives: [
         "Knowledgeable",
-        "Professional", 
-        "Data-driven",
-        "Strategic"
-      ]
+        "Professional",
+        "Data-driven", 
+        "Strategic",
+        "Alpha-hunting"
+      ],
+      
+      // Add Twitter-specific settings
+      settings: {
+        secrets: {
+          TWITTER_USERNAME: process.env.TWITTER_USERNAME,
+          TWITTER_PASSWORD: process.env.TWITTER_PASSWORD,
+          TWITTER_EMAIL: process.env.TWITTER_EMAIL,
+          TWITTER_2FA_SECRET: process.env.TWITTER_2FA_SECRET,
+          POST_IMMEDIATELY: "true",
+          ENABLE_ACTION_PROCESSING: "true",
+          MAX_ACTIONS_PROCESSING: "10",
+          POST_INTERVAL_MIN: "90",
+          POST_INTERVAL_MAX: "180",
+          TWITTER_POLL_INTERVAL: "120"
+        }
+      }
     };
     
-    console.log(`✅ Minimal character created: ${minimalCharacter.name}`);
-    console.log(`📝 Bio items: ${minimalCharacter.bio.length}`);
-    console.log(`🧠 Knowledge items: ${minimalCharacter.knowledge.length} (intentionally empty)`);
-    console.log(`📱 Post examples: ${minimalCharacter.postExamples.length}`);
+    console.log(`✅ Twitter-optimized character created: ${twitterOptimizedCharacter.name}`);
+    console.log(`📱 Post examples: ${twitterOptimizedCharacter.postExamples.length}`);
+    console.log(`🐦 Twitter settings configured: ${!!twitterOptimizedCharacter.settings.secrets.TWITTER_USERNAME}`);
     
-    // Ultra-simple database adapter
-    class UltraSimpleAdapter extends elizaCore.DatabaseAdapter {
+    // Simple database adapter
+    class TwitterOptimizedAdapter extends elizaCore.DatabaseAdapter {
       constructor() {
         super();
         this.storage = new Map();
-        console.log('🗄️ Ultra-simple database adapter initialized');
+        console.log('🗄️ Twitter-optimized database adapter initialized');
       }
       
-      // Memory methods - minimal implementation
       async getMemoryById(id) { return null; }
       async getMemories(params = {}) { return []; }
       async createMemory(memory) { return { ...memory, id: Date.now().toString() }; }
       async removeMemory(id) { return true; }
-      
-      // Relationship methods
       async getRelationships(params = {}) { return []; }
       async createRelationship(rel) { return { ...rel, id: Date.now().toString() }; }
-      
-      // Goal methods
       async getGoals(params = {}) { return []; }
       async createGoal(goal) { return { ...goal, id: Date.now().toString() }; }
       async updateGoal(goal) { return goal; }
       async removeGoal(id) { return true; }
-      
-      // Room methods
       async getRoom(id) { return null; }
       async createRoom(room) { return { ...room, id: Date.now().toString() }; }
-      
-      // Participant methods
       async getParticipantsForAccount(userId) { return []; }
       async getParticipantUserState(roomId, userId) { return null; }
       async setParticipantUserState(roomId, userId, state) { return state; }
-      
-      // Embedding methods - return null to completely skip
-      async getCachedEmbeddings(text) { 
-        console.log('🚫 Skipping embedding cache (minimal mode)');
-        return null; 
-      }
-      
-      async setCachedEmbeddings(text, embeddings) { 
-        console.log('🚫 Skipping embedding storage (minimal mode)');
-        return true; 
-      }
-      
-      // Account methods
+      async getCachedEmbeddings(text) { return null; }
+      async setCachedEmbeddings(text, embeddings) { return true; }
       async getAccountById(userId) { return null; }
       async createAccount(account) { return account; }
-      
-      // Search methods
       async searchMemoriesByEmbedding(embedding, params = {}) { return []; }
-      
-      // Logging
       async log(params) { 
         console.log('📝 DB Log:', typeof params === 'string' ? params : JSON.stringify(params));
         return true; 
       }
     }
     
-    const databaseAdapter = new UltraSimpleAdapter();
-    console.log('✅ Ultra-simple database adapter created');
+    const databaseAdapter = new TwitterOptimizedAdapter();
+    console.log('✅ Database adapter created');
     
-    // Load only essential plugins
-    console.log('\n🔌 Loading essential plugins...');
+    // Load Twitter plugin with enhanced debugging
+    console.log('\n🐦 Loading Twitter plugin...');
     const plugins = [];
     
-    // Twitter plugin (most important)
     try {
       const twitter = twitterPlugin.default || twitterPlugin;
-      plugins.push(twitter);
-      console.log('✅ Twitter plugin loaded');
+      if (twitter) {
+        plugins.push(twitter);
+        console.log('✅ Twitter plugin loaded successfully');
+        console.log('🔍 Twitter plugin type:', typeof twitter);
+        console.log('🔍 Twitter plugin name:', twitter.name || 'unnamed');
+      } else {
+        throw new Error('Twitter plugin is null or undefined');
+      }
     } catch (err) {
-      console.log('⚠️ Twitter plugin failed:', err.message);
+      console.error('❌ Twitter plugin failed to load:', err.message);
+      console.error('❌ Available exports:', Object.keys(twitterPlugin));
+      throw new Error('Cannot continue without Twitter plugin');
     }
     
-    console.log(`✅ Total plugins: ${plugins.length}`);
+    console.log(`✅ Total plugins loaded: ${plugins.length}`);
     
-    // Minimal runtime configuration
+    // Runtime configuration with Twitter focus
     const runtimeConfig = {
-      character: minimalCharacter,
+      character: twitterOptimizedCharacter,
       modelProvider: modelProvider,
       token: apiKey,
       databaseAdapter: databaseAdapter,
       plugins: plugins
     };
     
-    console.log('\n🤖 Creating minimal AgentRuntime...');
-    console.log('Config summary:', {
+    console.log('\n🤖 Creating AgentRuntime...');
+    console.log('Config:', {
       characterName: runtimeConfig.character.name,
       modelProvider: runtimeConfig.modelProvider,
       hasToken: !!runtimeConfig.token,
-      pluginCount: runtimeConfig.plugins.length,
-      knowledgeItems: runtimeConfig.character.knowledge.length
+      hasTwitterCreds: !!runtimeConfig.character.settings.secrets.TWITTER_USERNAME,
+      pluginCount: runtimeConfig.plugins.length
     });
     
-    // Create runtime
+    // Create and initialize runtime
     const runtime = new elizaCore.AgentRuntime(runtimeConfig);
-    console.log('✅ AgentRuntime created successfully');
+    console.log('✅ AgentRuntime created');
     
-    // Try to initialize with minimal processing
-    console.log('\n🔄 Initializing runtime (minimal mode - no knowledge processing)...');
+    console.log('\n🔄 Initializing runtime...');
+    await runtime.initialize();
+    console.log('✅ Runtime initialization completed');
     
-    try {
-      await runtime.initialize();
-      console.log('✅ Runtime initialization completed!');
-    } catch (initError) {
-      console.error('❌ Initialization failed:', initError.message);
-      
-      // Try to continue anyway for Twitter posting
-      console.log('⚠️ Attempting to continue with partial initialization...');
-    }
-    
-    // Check runtime status
-    console.log('\n📊 Runtime Status:');
-    console.log('- Character name:', runtime.character?.name);
-    console.log('- Model provider:', runtime.modelProvider);
-    console.log('- Has database:', !!runtime.databaseAdapter);
-    console.log('- Has clients:', !!runtime.clients);
+    // Enhanced Twitter client debugging
+    console.log('\n🐦 Twitter Client Status Check:');
+    console.log('- Runtime has clients property:', !!runtime.clients);
+    console.log('- Clients type:', typeof runtime.clients);
     
     if (runtime.clients) {
       console.log('- Available clients:', Object.keys(runtime.clients));
+      console.log('- Twitter client exists:', !!runtime.clients.twitter);
+      
       if (runtime.clients.twitter) {
-        console.log('✅ Twitter client is available!');
+        console.log('✅ Twitter client found!');
+        console.log('- Twitter client type:', typeof runtime.clients.twitter);
+        console.log('- Twitter client constructor:', runtime.clients.twitter.constructor.name);
+        
+        // Try to get client methods
+        try {
+          const methods = Object.getOwnPropertyNames(runtime.clients.twitter);
+          console.log('- Available methods:', methods.slice(0, 10));
+        } catch (err) {
+          console.log('- Could not inspect methods:', err.message);
+        }
       } else {
-        console.log('⚠️ Twitter client not found');
+        console.error('❌ Twitter client not found in runtime.clients');
+        console.log('- Available clients:', Object.keys(runtime.clients));
       }
     } else {
-      console.log('⚠️ No clients available');
+      console.error('❌ No clients property on runtime');
     }
     
-    console.log('\n🎉 DRAGONTRADE AGENT RUNNING! 🐉');
+    // Force Twitter client initialization if needed
+    if (!runtime.clients?.twitter) {
+      console.log('\n🔧 Attempting to force Twitter client initialization...');
+      
+      try {
+        // Try to manually initialize Twitter client
+        const TwitterClient = elizaCore.Clients?.TWITTER || elizaCore.TwitterClient;
+        if (TwitterClient) {
+          console.log('🔄 Found Twitter client class, attempting manual initialization...');
+          // This might need adjustment based on ElizaOS API
+        }
+      } catch (err) {
+        console.log('⚠️ Manual Twitter client initialization failed:', err.message);
+      }
+    }
+    
+    console.log('\n🎉 DRAGONTRADE AGENT STATUS:');
     console.log('═══════════════════════════════════════════');
     console.log('🤖 AI Model:', modelProvider.toUpperCase());
-    console.log('📱 Twitter: @reviceva');
+    console.log('📱 Twitter Account: @reviceva');
     console.log('🏷️ Branding: aideazz.xyz and $AZ');
-    console.log('⏰ Mode: Minimal (Knowledge processing disabled)');
+    console.log('🐦 Twitter Status:', runtime.clients?.twitter ? 'ACTIVE ✅' : 'INACTIVE ❌');
+    console.log('⏰ Expected Posting: Every 90-180 minutes');
     console.log('💰 Cost: ~$5-15/month');
     console.log('═══════════════════════════════════════════');
     console.log('⏰ Started at:', new Date().toISOString());
     
-    // Simple monitoring loop
+    // Enhanced monitoring with Twitter status
     let minutes = 0;
     setInterval(() => {
       minutes++;
@@ -262,11 +285,16 @@ async function main() {
         console.log(`\n📊 [${timestamp}] DragonTrade Status:`);
         console.log(`   ⏱️  Running: ${minutes} minutes`);
         console.log(`   🤖 Model: ${modelProvider.toUpperCase()}`);
-        console.log(`   🐦 Twitter: ${runtime.clients?.twitter ? 'ACTIVE' : 'INACTIVE'}`);
+        console.log(`   🐦 Twitter: ${runtime.clients?.twitter ? 'ACTIVE ✅' : 'INACTIVE ❌'}`);
         console.log(`   💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
-        console.log(`   ⏰ Next post: ${90 - (minutes % 90)}-${180 - (minutes % 180)} min`);
+        console.log(`   ⏰ Next post window: ${90 - (minutes % 90)}-${180 - (minutes % 180)} min`);
+        
+        // Show posting schedule
+        if (minutes >= 90 && !runtime.clients?.twitter) {
+          console.log(`   ⚠️  Twitter inactive for ${minutes} minutes - posting may be blocked`);
+        }
       } else {
-        console.log(`[${timestamp}] 🐉 DragonTrade: ${minutes}min active`);
+        console.log(`[${timestamp}] 🐉 DragonTrade: ${minutes}min | Twitter: ${runtime.clients?.twitter ? 'ACTIVE' : 'INACTIVE'}`);
       }
     }, 60000);
     
@@ -282,17 +310,6 @@ async function main() {
       process.exit(0);
     });
     
-    // Error handling
-    process.on('uncaughtException', (err) => {
-      console.error('💥 Uncaught exception:', err.message);
-      // Don't exit - try to continue
-    });
-    
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('💥 Unhandled rejection:', reason);
-      // Don't exit - try to continue
-    });
-    
   } catch (error) {
     console.error('\n💥 FATAL ERROR:');
     console.error('Message:', error.message);
@@ -300,16 +317,17 @@ async function main() {
     
     console.error('\n🔍 Debug Info:');
     console.error('- ANTHROPIC_API_KEY:', !!process.env.ANTHROPIC_API_KEY);
-    console.error('- OPENAI_API_KEY:', !!process.env.OPENAI_API_KEY);
     console.error('- TWITTER_USERNAME:', !!process.env.TWITTER_USERNAME);
-    console.error('- Character file exists:', fs.existsSync(characterPath));
+    console.error('- TWITTER_PASSWORD:', !!process.env.TWITTER_PASSWORD);
+    console.error('- TWITTER_EMAIL:', !!process.env.TWITTER_EMAIL);
+    console.error('- TWITTER_2FA_SECRET:', !!process.env.TWITTER_2FA_SECRET);
     
     process.exit(1);
   }
 }
 
-console.log('🌟 Starting DragonTrade Agent (Minimal Mode - No Knowledge Processing)...');
+console.log('🌟 Starting DragonTrade Agent (Twitter Debug Mode)...');
 main().catch(err => {
-  console.error('💥 Main function failed:', err);
+  console.error('💥 Startup failed:', err);
   process.exit(1);
 });
