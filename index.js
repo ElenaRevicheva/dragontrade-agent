@@ -12,8 +12,8 @@ dotenv.config();
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
-process.env.POST_INTERVAL_MIN = '60';
-process.env.POST_INTERVAL_MAX = '120';
+process.env.POST_INTERVAL_MIN = '30';
+process.env.POST_INTERVAL_MAX = '60';
 process.env.TWITTER_POLL_INTERVAL = '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
@@ -713,7 +713,9 @@ class AuthenticTwitterClient {
     this.rateLimitTracker = {
       lastPost: 0,
       postsToday: 0,
-      resetTime: Date.now() + (24 * 60 * 60 * 1000) // 24 hours from now
+      resetTime: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
+      minInterval: 15 * 60 * 1000, // 15 minutes minimum between posts
+      maxDailyPosts: 40 // Conservative daily limit for free account
     };
     
     console.log('🔥 100% Authentic CMC Engine loaded');
@@ -976,21 +978,22 @@ class AuthenticTwitterClient {
       console.log('🔄 [RATE LIMIT] Daily counter reset');
     }
     
-    // Check if we're within Twitter's limits (300 tweets per 3 hours)
+    // Check minimum interval between posts (15 minutes)
     const timeSinceLastPost = now - this.rateLimitTracker.lastPost;
-    const minInterval = 2 * 60 * 1000; // 2 minutes minimum between posts
     
-    if (timeSinceLastPost < minInterval) {
-      const waitMinutes = Math.ceil((minInterval - timeSinceLastPost) / 60000);
+    if (timeSinceLastPost < this.rateLimitTracker.minInterval) {
+      const waitMinutes = Math.ceil((this.rateLimitTracker.minInterval - timeSinceLastPost) / 60000);
       console.log(`⏰ [RATE LIMIT] Too soon to post, waiting ${waitMinutes} minutes`);
       return false;
     }
     
-    if (this.rateLimitTracker.postsToday >= 50) { // Conservative daily limit
-      console.log('🚫 [RATE LIMIT] Daily post limit reached (50 posts)');
+    // Check daily post limit (40 posts for free account)
+    if (this.rateLimitTracker.postsToday >= this.rateLimitTracker.maxDailyPosts) {
+      console.log(`🚫 [RATE LIMIT] Daily post limit reached (${this.rateLimitTracker.maxDailyPosts} posts)`);
       return false;
     }
     
+    console.log(`📊 [RATE LIMIT] Posts today: ${this.rateLimitTracker.postsToday}/${this.rateLimitTracker.maxDailyPosts}`);
     return true;
   }
 
@@ -1000,6 +1003,9 @@ class AuthenticTwitterClient {
       console.log('⏰ [RATE LIMIT] Skipping post due to rate limits');
       return null;
     }
+    
+    // Wait if needed to respect minimum interval
+    await this.waitIfNeeded();
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -1020,7 +1026,7 @@ class AuthenticTwitterClient {
         
         if (error.code === 429) {
           // Rate limit hit - calculate backoff time
-          const backoffMinutes = Math.min(Math.pow(2, attempt), 60); // Exponential backoff, max 60 minutes
+          const backoffMinutes = Math.min(Math.pow(2, attempt), 30); // Exponential backoff, max 30 minutes
           console.log(`⏰ [RATE LIMIT] Backing off for ${backoffMinutes} minutes...`);
           
           if (attempt < maxRetries) {
@@ -1049,6 +1055,18 @@ class AuthenticTwitterClient {
       }
     }
     return null;
+  }
+
+  async waitIfNeeded() {
+    const now = Date.now();
+    const timeSinceLastPost = now - this.rateLimitTracker.lastPost;
+    
+    if (timeSinceLastPost < this.rateLimitTracker.minInterval) {
+      const waitTime = this.rateLimitTracker.minInterval - timeSinceLastPost;
+      const waitMinutes = Math.ceil(waitTime / 60000);
+      console.log(`⏰ [RATE LIMIT] Waiting ${waitMinutes} minutes to respect minimum interval`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
   }
 
   getStatus() {
