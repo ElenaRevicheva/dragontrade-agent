@@ -12,8 +12,8 @@ dotenv.config();
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
-process.env.POST_INTERVAL_MIN = '30';
-process.env.POST_INTERVAL_MAX = '60';
+process.env.POST_INTERVAL_MIN = '60';
+process.env.POST_INTERVAL_MAX = '120';
 process.env.TWITTER_POLL_INTERVAL = '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
@@ -714,10 +714,12 @@ class AuthenticTwitterClient {
       lastPost: 0,
       postsToday: 0,
       resetTime: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
-      minInterval: 30 * 60 * 1000, // 30 minutes minimum between posts (increased)
-      maxDailyPosts: 20, // Very conservative daily limit
+      minInterval: 60 * 60 * 1000, // 60 minutes minimum between posts (very conservative)
+      maxDailyPosts: 10, // Extremely conservative daily limit
       consecutiveFailures: 0,
-      lastFailureTime: 0
+      lastFailureTime: 0,
+      isPaused: false,
+      pauseUntil: 0
     };
     
     console.log('🔥 100% Authentic CMC Engine loaded');
@@ -755,6 +757,18 @@ class AuthenticTwitterClient {
     const maxInterval = parseInt(process.env.POST_INTERVAL_MAX) * 60 * 1000;
     
     const schedulePost = () => {
+      // Check if we should pause posting due to rate limits
+      if (this.rateLimitTracker.isPaused) {
+        const remainingMinutes = Math.ceil((this.rateLimitTracker.pauseUntil - Date.now()) / 60000);
+        console.log(`🚫 [RATE LIMIT] Skipping post scheduling - bot paused for ${remainingMinutes} minutes`);
+        
+        // Schedule next check in 30 minutes
+        this.postInterval = setTimeout(() => {
+          schedulePost();
+        }, 30 * 60 * 1000);
+        return;
+      }
+      
       const randomInterval = Math.random() * (maxInterval - minInterval) + minInterval;
       const minutesUntilPost = Math.round(randomInterval / 60000);
       
@@ -973,6 +987,18 @@ class AuthenticTwitterClient {
   checkRateLimits() {
     const now = Date.now();
     
+    // Check if we're in a pause period
+    if (this.rateLimitTracker.isPaused && now < this.rateLimitTracker.pauseUntil) {
+      const remainingMinutes = Math.ceil((this.rateLimitTracker.pauseUntil - now) / 60000);
+      console.log(`🚫 [RATE LIMIT] Bot is paused due to rate limits, resuming in ${remainingMinutes} minutes`);
+      return false;
+    } else if (this.rateLimitTracker.isPaused && now >= this.rateLimitTracker.pauseUntil) {
+      // Resume after pause
+      this.rateLimitTracker.isPaused = false;
+      this.rateLimitTracker.consecutiveFailures = 0;
+      console.log('🔄 [RATE LIMIT] Pause period ended, resuming normal operation');
+    }
+    
     // Reset daily counter if 24 hours have passed
     if (now > this.rateLimitTracker.resetTime) {
       this.rateLimitTracker.postsToday = 0;
@@ -980,23 +1006,16 @@ class AuthenticTwitterClient {
       console.log('🔄 [RATE LIMIT] Daily counter reset');
     }
     
-    // Check for too many consecutive failures
-    if (this.rateLimitTracker.consecutiveFailures >= 5) {
-      const timeSinceLastFailure = now - this.rateLimitTracker.lastFailureTime;
-      const cooldownPeriod = 2 * 60 * 60 * 1000; // 2 hours
-      
-      if (timeSinceLastFailure < cooldownPeriod) {
-        const remainingMinutes = Math.ceil((cooldownPeriod - timeSinceLastFailure) / 60000);
-        console.log(`🚫 [RATE LIMIT] Too many consecutive failures (${this.rateLimitTracker.consecutiveFailures}), cooling down for ${remainingMinutes} minutes`);
-        return false;
-      } else {
-        // Reset consecutive failures after cooldown
-        this.rateLimitTracker.consecutiveFailures = 0;
-        console.log('🔄 [RATE LIMIT] Cooldown period ended, resetting consecutive failures');
-      }
+    // Check for too many consecutive failures - trigger pause
+    if (this.rateLimitTracker.consecutiveFailures >= 3) {
+      // Pause for 4 hours after 3 consecutive failures
+      this.rateLimitTracker.isPaused = true;
+      this.rateLimitTracker.pauseUntil = now + (4 * 60 * 60 * 1000); // 4 hours
+      console.log(`🚫 [RATE LIMIT] 3+ consecutive failures detected, pausing bot for 4 hours`);
+      return false;
     }
     
-    // Check minimum interval between posts (30 minutes)
+    // Check minimum interval between posts (60 minutes)
     const timeSinceLastPost = now - this.rateLimitTracker.lastPost;
     
     if (timeSinceLastPost < this.rateLimitTracker.minInterval) {
@@ -1005,7 +1024,7 @@ class AuthenticTwitterClient {
       return false;
     }
     
-    // Check daily post limit (20 posts for very conservative approach)
+    // Check daily post limit (10 posts for extremely conservative approach)
     if (this.rateLimitTracker.postsToday >= this.rateLimitTracker.maxDailyPosts) {
       console.log(`🚫 [RATE LIMIT] Daily post limit reached (${this.rateLimitTracker.maxDailyPosts} posts)`);
       return false;
