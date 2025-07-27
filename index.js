@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { EducationalMCP } from './educational-mcp-simple.js';
 
 dotenv.config();
 
@@ -26,6 +27,20 @@ class CryptoEducationEngine {
     this.marketCycles = [];
     this.fearGreedHistory = [];
     this.educationalTopics = ['risk_management', 'position_sizing', 'dollar_cost_averaging', 'market_psychology', 'scam_detection', 'technical_analysis', 'fundamental_analysis', 'portfolio_allocation'];
+    this.educationalMCP = new EducationalMCP();
+    this.mcpInitialized = false;
+  }
+
+  async initializeMCP() {
+    if (!this.mcpInitialized) {
+      try {
+        await this.educationalMCP.initialize();
+        this.mcpInitialized = true;
+        console.log('🎓 Educational MCP integrated with CryptoEducationEngine');
+      } catch (error) {
+        console.log('⚠️ Educational MCP fallback mode activated');
+      }
+    }
   }
 
   analyzeScamRisk(tweet, marketData) {
@@ -92,6 +107,69 @@ class CryptoEducationEngine {
 
   generateStrategyGuide(marketData) {
     return `📚 ALGOM STRATEGY DEVELOPMENT GUIDE:\n\n🎯 BUILD YOUR PERSONAL CRYPTO STRATEGY:\n\n🔥 STEP 1: DEFINE YOUR GOALS\n• Investment timeline: 1 year? 5 years? 10 years?\n• Risk tolerance: Can you stomach 50% drops?\n• Capital: Never invest more than you can lose\n\n💡 STEP 2: PICK YOUR APPROACH\n• Conservative: 70% BTC/ETH, 30% top 10 coins\n• Balanced: 50% BTC/ETH, 30% top 20, 20% speculation\n• Aggressive: 30% BTC/ETH, 70% smaller caps (RISKY)\n\n📊 STEP 3: EXECUTION RULES\n• Dollar-cost average weekly/monthly\n• Take profits at predetermined levels\n• Rebalance quarterly\n• NEVER change strategy during FOMO/panic\n\n⚠️ STRATEGY KILLER: Changing plans based on emotions\n✅ WEALTH BUILDER: Boring consistency over years\n\nCurrent market cap: $${Math.floor(marketData.total_market_cap / 1000000000)}B\nThe opportunity is real. The discipline is rare. 🎯\n\n#Strategy #CryptoEducation #AlgomEducation`;
+  }
+
+  // Enhanced educational methods with MCP integration
+  async generateEnhancedEducationalContent(marketData) {
+    await this.initializeMCP();
+    
+    if (this.mcpInitialized) {
+      try {
+        const enhancedContent = await this.educationalMCP.createEducationalPost(marketData);
+        return {
+          type: 'enhanced_educational',
+          status: 'educational',
+          content: enhancedContent
+        };
+      } catch (error) {
+        console.log('⚠️ MCP educational content failed, using fallback');
+      }
+    }
+    
+    // Fallback to original educational content
+    return this.generateEducationalContent(marketData);
+  }
+
+  async generateMCPEnhancedBitcoinAnalysis(marketData) {
+    await this.initializeMCP();
+    
+    if (this.mcpInitialized) {
+      try {
+        const btcAnalysis = await this.educationalMCP.getEducationalBitcoinAnalysis();
+        return this.educationalMCP.enhanceWithMCP(btcAnalysis);
+      } catch (error) {
+        console.log('⚠️ MCP Bitcoin analysis failed, using fallback');
+      }
+    }
+    
+    // Fallback to original method
+    return this.generateTradingPsychologyLesson(marketData)?.content || 'Educational content unavailable';
+  }
+
+  async generateAZTokenEducationalPost(marketData) {
+    await this.initializeMCP();
+    
+    if (this.mcpInitialized) {
+      try {
+        const azContent = await this.educationalMCP.getAZTokenEducationalContent();
+        const marketInsight = await this.educationalMCP.getMarketEducationInsight();
+        
+        return `${marketInsight}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${azContent}\n\n🔗 Join the Educational Revolution\n📚 CoinGecko MCP + AZ Token + Real Learning`;
+      } catch (error) {
+        console.log('⚠️ AZ token educational content failed, using fallback');
+      }
+    }
+    
+    // Fallback to original scam alert
+    return this.generateScamAlert(marketData).content;
+  }
+
+  // Method to enhance existing posts with MCP and AZ token integration
+  enhancePostWithMCP(originalContent) {
+    if (this.mcpInitialized) {
+      return this.educationalMCP.enhanceWithMCP(originalContent);
+    }
+    return originalContent;
   }
 }
 
@@ -205,6 +283,15 @@ class PersonalAnalysisEngine {
     if (timeSinceLastEducation < fourHours) {
       return null;
     }
+
+    // Enhanced educational content with MCP integration
+    const enhancedContent = await this.educationEngine.generateEnhancedEducationalContent(marketData);
+    if (enhancedContent) {
+      this.lastEducationalPost = Date.now();
+      return enhancedContent;
+    }
+
+    // Fallback to original educational content
     const educationalTypes = [
       () => this.educationEngine.generateTradingPsychologyLesson(marketData),
       () => this.educationEngine.generateRiskManagementLesson(marketData),
@@ -278,9 +365,23 @@ class PersonalAnalysisEngine {
     const analyses = [
       await this.generateEducationalContent(marketData),
       await this.generateScamDetection(tweet, marketData),
-      await this.generatePriceVerification(tweet, marketData)
+      await this.generatePriceVerification(tweet, marketData),
+      await this.generateAZTokenEducationalPost(marketData)
     ];
     return analyses.find(analysis => analysis !== null);
+  }
+
+  async generateAZTokenEducationalPost(marketData) {
+    // 15% chance to generate AZ token educational content
+    if (Math.random() < 0.15) {
+      const azContent = await this.educationEngine.generateAZTokenEducationalPost(marketData);
+      return {
+        type: 'az_token_educational',
+        status: 'educational',
+        content: azContent
+      };
+    }
+    return null;
   }
 }
 
@@ -403,11 +504,11 @@ class AuthenticCMCEngine {
       return this.generateNoDataPost();
     }
     const insight = { type: this.selectRealInsightType(marketData), data: marketData, timestamp: Date.now(), postNumber: this.postCounter };
-    return this.formatRealInsight(insight);
+    return await this.formatRealInsight(insight);
   }
 
   selectRealInsightType(marketData) {
-    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness'];
+    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational'];
     if (this.postCounter % 10 === 0) return 'real_transparency';
     if (this.postCounter % 7 === 0) return 'educational_content';
     if (this.postCounter % 5 === 0) return 'real_sentiment_meter';
@@ -419,11 +520,13 @@ class AuthenticCMCEngine {
       return 'risk_management_tip';
     }
     if (Math.random() < 0.15) return 'scam_awareness';
+    if (Math.random() < 0.10) return 'mcp_enhanced_educational';
+    if (Math.random() < 0.08) return 'az_token_educational';
     if (marketData.top_gainers.length === 0) return 'real_market_snapshot';
     return types[Math.floor(Math.random() * 6)];
   }
 
-  formatRealInsight(insight) {
+  async formatRealInsight(insight) {
     switch (insight.type) {
       case 'real_data_report':
         return this.generateRealDataReport(insight.data);
@@ -445,6 +548,10 @@ class AuthenticCMCEngine {
         return this.generateRiskManagementPost(insight.data);
       case 'scam_awareness':
         return this.generateScamAwarenessPost(insight.data);
+      case 'mcp_enhanced_educational':
+        return await this.generateMCPEnhancedEducationalPost(insight.data);
+      case 'az_token_educational':
+        return await this.generateAZTokenEducationalPost(insight.data);
       default:
         return this.generateRealDataReport(insight.data);
     }
@@ -495,6 +602,26 @@ class AuthenticCMCEngine {
     ];
     const selectedScam = scamTypes[Math.floor(Math.random() * scamTypes.length)];
     return selectedScam.content;
+  }
+
+  async generateMCPEnhancedEducationalPost(data) {
+    try {
+      const enhancedContent = await this.analysisEngine.educationEngine.generateEnhancedEducationalContent(data);
+      return enhancedContent.content || this.generateEducationalPost(data);
+    } catch (error) {
+      console.log('⚠️ MCP enhanced educational post failed, using fallback');
+      return this.generateEducationalPost(data);
+    }
+  }
+
+  async generateAZTokenEducationalPost(data) {
+    try {
+      const azContent = await this.analysisEngine.educationEngine.generateAZTokenEducationalPost(data);
+      return azContent;
+    } catch (error) {
+      console.log('⚠️ AZ token educational post failed, using fallback');
+      return this.generateScamAwarenessPost(data);
+    }
   }
 
   generateRealDataReport(data) {
@@ -813,6 +940,7 @@ class AuthenticTwitterClient {
       console.log('🔥 [POST] Posting 100% AUTHENTIC content:', authenticContent.substring(0, 60) + '...');
       console.log('📊 [POST] Contains real numbers:', /\$[\d,]+/.test(authenticContent) ? '✅ YES' : '⚠️ Data unavailable');
       console.log('🚫 [POST] Contains predictions:', /predict|expect|will|should|target/i.test(authenticContent) ? '❌ YES (ERROR)' : '✅ NO');
+      console.log('🎓 [POST] Educational features:', /MCP|AZ Token|Educational/i.test(authenticContent) ? '✅ ENHANCED' : '📚 Standard');
       
       const tweet = await this.client.v2.tweet(authenticContent);
       

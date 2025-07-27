@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/atuona/dragontrade-agent"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
+      }
+    },
+    "coingecko_mcp": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.api.coingecko.com/sse"
+      ],
+      "env": {}
+    }
+  }
+}
