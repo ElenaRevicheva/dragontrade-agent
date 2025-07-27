@@ -714,8 +714,10 @@ class AuthenticTwitterClient {
       lastPost: 0,
       postsToday: 0,
       resetTime: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
-      minInterval: 15 * 60 * 1000, // 15 minutes minimum between posts
-      maxDailyPosts: 40 // Conservative daily limit for free account
+      minInterval: 30 * 60 * 1000, // 30 minutes minimum between posts (increased)
+      maxDailyPosts: 20, // Very conservative daily limit
+      consecutiveFailures: 0,
+      lastFailureTime: 0
     };
     
     console.log('🔥 100% Authentic CMC Engine loaded');
@@ -978,7 +980,23 @@ class AuthenticTwitterClient {
       console.log('🔄 [RATE LIMIT] Daily counter reset');
     }
     
-    // Check minimum interval between posts (15 minutes)
+    // Check for too many consecutive failures
+    if (this.rateLimitTracker.consecutiveFailures >= 5) {
+      const timeSinceLastFailure = now - this.rateLimitTracker.lastFailureTime;
+      const cooldownPeriod = 2 * 60 * 60 * 1000; // 2 hours
+      
+      if (timeSinceLastFailure < cooldownPeriod) {
+        const remainingMinutes = Math.ceil((cooldownPeriod - timeSinceLastFailure) / 60000);
+        console.log(`🚫 [RATE LIMIT] Too many consecutive failures (${this.rateLimitTracker.consecutiveFailures}), cooling down for ${remainingMinutes} minutes`);
+        return false;
+      } else {
+        // Reset consecutive failures after cooldown
+        this.rateLimitTracker.consecutiveFailures = 0;
+        console.log('🔄 [RATE LIMIT] Cooldown period ended, resetting consecutive failures');
+      }
+    }
+    
+    // Check minimum interval between posts (30 minutes)
     const timeSinceLastPost = now - this.rateLimitTracker.lastPost;
     
     if (timeSinceLastPost < this.rateLimitTracker.minInterval) {
@@ -987,7 +1005,7 @@ class AuthenticTwitterClient {
       return false;
     }
     
-    // Check daily post limit (40 posts for free account)
+    // Check daily post limit (20 posts for very conservative approach)
     if (this.rateLimitTracker.postsToday >= this.rateLimitTracker.maxDailyPosts) {
       console.log(`🚫 [RATE LIMIT] Daily post limit reached (${this.rateLimitTracker.maxDailyPosts} posts)`);
       return false;
@@ -1017,23 +1035,34 @@ class AuthenticTwitterClient {
         // Update rate limit tracker on success
         this.rateLimitTracker.lastPost = Date.now();
         this.rateLimitTracker.postsToday++;
-        console.log(`📊 [RATE LIMIT] Posts today: ${this.rateLimitTracker.postsToday}/50`);
+        this.rateLimitTracker.consecutiveFailures = 0; // Reset on success
+        console.log(`📊 [RATE LIMIT] Posts today: ${this.rateLimitTracker.postsToday}/${this.rateLimitTracker.maxDailyPosts}`);
         
         return tweet;
         
       } catch (error) {
         console.error(`❌ [POST] Attempt ${attempt} failed:`, error.message);
         
+        // Track consecutive failures
+        this.rateLimitTracker.consecutiveFailures++;
+        this.rateLimitTracker.lastFailureTime = Date.now();
+        
         if (error.code === 429) {
-          // Rate limit hit - calculate backoff time
-          const backoffMinutes = Math.min(Math.pow(2, attempt), 30); // Exponential backoff, max 30 minutes
-          console.log(`⏰ [RATE LIMIT] Backing off for ${backoffMinutes} minutes...`);
+          // Rate limit hit - use more aggressive backoff
+          const baseBackoff = Math.min(Math.pow(2, attempt), 60); // Max 60 minutes
+          const consecutiveMultiplier = Math.min(this.rateLimitTracker.consecutiveFailures, 5);
+          const backoffMinutes = baseBackoff * consecutiveMultiplier;
+          
+          console.log(`⏰ [RATE LIMIT] Backing off for ${backoffMinutes} minutes (consecutive failures: ${this.rateLimitTracker.consecutiveFailures})`);
           
           if (attempt < maxRetries) {
             // Wait before next attempt
             await new Promise(resolve => setTimeout(resolve, backoffMinutes * 60 * 1000));
           } else {
             console.log('🚫 [RATE LIMIT] Max retries reached, skipping this post');
+            // Increase minimum interval after consecutive failures
+            this.rateLimitTracker.minInterval = Math.min(this.rateLimitTracker.minInterval * 1.5, 120 * 60 * 1000);
+            console.log(`⏰ [RATE LIMIT] Increased minimum interval to ${this.rateLimitTracker.minInterval / 60000} minutes`);
             return null;
           }
         } else if (error.code === 403) {
@@ -1041,8 +1070,8 @@ class AuthenticTwitterClient {
           console.log('🚫 [FORBIDDEN] Content may be inappropriate, skipping');
           return null;
         } else {
-          // Other errors - wait shorter time
-          const waitTime = Math.min(attempt * 5, 30) * 60 * 1000; // 5-30 minutes
+          // Other errors - wait longer time
+          const waitTime = Math.min(attempt * 10, 60) * 60 * 1000; // 10-60 minutes
           console.log(`⏰ [ERROR] Waiting ${waitTime/60000} minutes before retry...`);
           
           if (attempt < maxRetries) {
