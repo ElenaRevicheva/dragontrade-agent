@@ -12,8 +12,8 @@ dotenv.config();
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
-process.env.POST_INTERVAL_MIN = '35';
-process.env.POST_INTERVAL_MAX = '75';
+process.env.POST_INTERVAL_MIN = '60';
+process.env.POST_INTERVAL_MAX = '120';
 process.env.TWITTER_POLL_INTERVAL = '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
@@ -710,6 +710,11 @@ class AuthenticTwitterClient {
     this.repostInterval = null;
     this.postCount = 0;
     this.lastTimelineCheck = 0;
+    this.rateLimitTracker = {
+      lastPost: 0,
+      postsToday: 0,
+      resetTime: Date.now() + (24 * 60 * 60 * 1000) // 24 hours from now
+    };
     
     console.log('🔥 100% Authentic CMC Engine loaded');
     console.log('🎯 Quality Control + Education features activated');
@@ -942,13 +947,16 @@ class AuthenticTwitterClient {
       console.log('🚫 [POST] Contains predictions:', /predict|expect|will|should|target/i.test(authenticContent) ? '❌ YES (ERROR)' : '✅ NO');
       console.log('🎓 [POST] Educational features:', /MCP|AZ Token|Educational/i.test(authenticContent) ? '✅ ENHANCED' : '📚 Standard');
       
-      const tweet = await this.client.v2.tweet(authenticContent);
+      // Enhanced rate limiting and retry logic
+      const tweet = await this.postWithRetry(authenticContent);
       
-      console.log('✅ 100% AUTHENTIC POST PUBLISHED!');
-      console.log('🐉 Tweet ID:', tweet.data.id);
-      console.log('📊 Content length:', authenticContent.length);
-      console.log('🏆 Authentic posts delivered:', this.postCount);
-      console.log('🎯 Reputation: Building through transparency + education...');
+      if (tweet) {
+        console.log('✅ 100% AUTHENTIC POST PUBLISHED!');
+        console.log('🐉 Tweet ID:', tweet.data.id);
+        console.log('📊 Content length:', authenticContent.length);
+        console.log('🏆 Authentic posts delivered:', this.postCount);
+        console.log('🎯 Reputation: Building through transparency + education...');
+      }
       
       return tweet;
     } catch (error) {
@@ -956,6 +964,91 @@ class AuthenticTwitterClient {
       console.error('🔧 Will retry on next cycle...');
       return null;
     }
+  }
+
+  checkRateLimits() {
+    const now = Date.now();
+    
+    // Reset daily counter if 24 hours have passed
+    if (now > this.rateLimitTracker.resetTime) {
+      this.rateLimitTracker.postsToday = 0;
+      this.rateLimitTracker.resetTime = now + (24 * 60 * 60 * 1000);
+      console.log('🔄 [RATE LIMIT] Daily counter reset');
+    }
+    
+    // Check if we're within Twitter's limits (300 tweets per 3 hours)
+    const timeSinceLastPost = now - this.rateLimitTracker.lastPost;
+    const minInterval = 2 * 60 * 1000; // 2 minutes minimum between posts
+    
+    if (timeSinceLastPost < minInterval) {
+      const waitMinutes = Math.ceil((minInterval - timeSinceLastPost) / 60000);
+      console.log(`⏰ [RATE LIMIT] Too soon to post, waiting ${waitMinutes} minutes`);
+      return false;
+    }
+    
+    if (this.rateLimitTracker.postsToday >= 50) { // Conservative daily limit
+      console.log('🚫 [RATE LIMIT] Daily post limit reached (50 posts)');
+      return false;
+    }
+    
+    return true;
+  }
+
+  async postWithRetry(content, maxRetries = 3) {
+    // Check rate limits before attempting to post
+    if (!this.checkRateLimits()) {
+      console.log('⏰ [RATE LIMIT] Skipping post due to rate limits');
+      return null;
+    }
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📤 [POST] Attempt ${attempt}/${maxRetries}...`);
+        
+        const tweet = await this.client.v2.tweet(content);
+        console.log(`✅ [POST] Success on attempt ${attempt}`);
+        
+        // Update rate limit tracker on success
+        this.rateLimitTracker.lastPost = Date.now();
+        this.rateLimitTracker.postsToday++;
+        console.log(`📊 [RATE LIMIT] Posts today: ${this.rateLimitTracker.postsToday}/50`);
+        
+        return tweet;
+        
+      } catch (error) {
+        console.error(`❌ [POST] Attempt ${attempt} failed:`, error.message);
+        
+        if (error.code === 429) {
+          // Rate limit hit - calculate backoff time
+          const backoffMinutes = Math.min(Math.pow(2, attempt), 60); // Exponential backoff, max 60 minutes
+          console.log(`⏰ [RATE LIMIT] Backing off for ${backoffMinutes} minutes...`);
+          
+          if (attempt < maxRetries) {
+            // Wait before next attempt
+            await new Promise(resolve => setTimeout(resolve, backoffMinutes * 60 * 1000));
+          } else {
+            console.log('🚫 [RATE LIMIT] Max retries reached, skipping this post');
+            return null;
+          }
+        } else if (error.code === 403) {
+          // Forbidden - likely content issue
+          console.log('🚫 [FORBIDDEN] Content may be inappropriate, skipping');
+          return null;
+        } else {
+          // Other errors - wait shorter time
+          const waitTime = Math.min(attempt * 5, 30) * 60 * 1000; // 5-30 minutes
+          console.log(`⏰ [ERROR] Waiting ${waitTime/60000} minutes before retry...`);
+          
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            console.log('🚫 [ERROR] Max retries reached, skipping this post');
+            return null;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   getStatus() {
