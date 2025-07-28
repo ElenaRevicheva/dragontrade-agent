@@ -39,6 +39,12 @@ class CoinGeckoMCPClient {
       const toolsResponse = await this.client.listTools();
       this.tools = toolsResponse.tools;
       console.log(`📊 [COINGECKO MCP] Available tools: ${this.tools.length}`);
+      
+      // Log available tool names for debugging
+      console.log('🔧 [COINGECKO MCP] Available tool names:');
+      this.tools.forEach((tool, index) => {
+        console.log(`  ${index + 1}. ${tool.name}`);
+      });
 
       this.isConnected = true;
       return true;
@@ -57,22 +63,28 @@ class CoinGeckoMCPClient {
 
     try {
       const result = await this.client.callTool({
-        name: 'get_crypto_price',
+        name: 'get_simple_price',
         arguments: {
-          symbol: symbol.toLowerCase(),
-          vs_currency: vsCurrency
+          ids: symbol.toLowerCase(),
+          vs_currencies: vsCurrency,
+          include_24hr_change: true,
+          include_market_cap: true,
+          include_24hr_vol: true
         }
       });
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
-        return {
-          symbol: symbol.toUpperCase(),
-          price: data.price,
-          change_24h: data.price_change_percentage_24h || 0,
-          market_cap: data.market_cap,
-          volume_24h: data.total_volume
-        };
+        const coinData = data[symbol.toLowerCase()];
+        if (coinData) {
+          return {
+            symbol: symbol.toUpperCase(),
+            price: coinData[vsCurrency],
+            change_24h: coinData[`${vsCurrency}_24h_change`] || 0,
+            market_cap: coinData[`${vsCurrency}_market_cap`] || 0,
+            volume_24h: coinData[`${vsCurrency}_24h_vol`] || 0
+          };
+        }
       }
     } catch (error) {
       console.log(`⚠️ [COINGECKO MCP] Error getting price for ${symbol}:`, error.message);
@@ -88,26 +100,34 @@ class CoinGeckoMCPClient {
 
     try {
       const result = await this.client.callTool({
-        name: 'get_market_data',
+        name: 'get_coins_markets',
         arguments: {
-          symbol: symbol.toLowerCase(),
-          vs_currency: vsCurrency
+          vs_currency: vsCurrency,
+          ids: symbol.toLowerCase(),
+          order: 'market_cap_desc',
+          per_page: 1,
+          page: 1,
+          sparkline: false,
+          price_change_percentage: '24h'
         }
       });
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
-        return {
-          symbol: symbol.toUpperCase(),
-          price: data.current_price,
-          change_24h: data.price_change_percentage_24h || 0,
-          market_cap: data.market_cap,
-          volume_24h: data.total_volume,
-          high_24h: data.high_24h,
-          low_24h: data.low_24h,
-          circulating_supply: data.circulating_supply,
-          total_supply: data.total_supply
-        };
+        if (data && data.length > 0) {
+          const coinData = data[0];
+          return {
+            symbol: symbol.toUpperCase(),
+            price: coinData.current_price,
+            change_24h: coinData.price_change_percentage_24h || 0,
+            market_cap: coinData.market_cap,
+            volume_24h: coinData.total_volume,
+            high_24h: coinData.high_24h,
+            low_24h: coinData.low_24h,
+            circulating_supply: coinData.circulating_supply,
+            total_supply: coinData.total_supply
+          };
+        }
       }
     } catch (error) {
       console.log(`⚠️ [COINGECKO MCP] Error getting market data for ${symbol}:`, error.message);
@@ -123,7 +143,7 @@ class CoinGeckoMCPClient {
 
     try {
       const result = await this.client.callTool({
-        name: 'get_trending_coins',
+        name: 'get_coins_top_gainers_losers',
         arguments: {
           vs_currency: vsCurrency
         }
@@ -131,14 +151,19 @@ class CoinGeckoMCPClient {
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
-        return data.coins.map(coin => ({
-          symbol: coin.item.symbol.toUpperCase(),
-          name: coin.item.name,
-          price: coin.item.price_btc,
-          change_24h: coin.item.data?.price_change_percentage_24h?.usd || 0,
-          market_cap: coin.item.data?.market_cap || 0,
-          volume_24h: coin.item.data?.total_volume || 0
-        }));
+        if (Array.isArray(data)) {
+          return data.map(coin => ({
+            symbol: coin.symbol.toUpperCase(),
+            name: coin.name,
+            price: coin.current_price,
+            change_24h: coin.price_change_percentage_24h || 0,
+            market_cap: coin.market_cap || 0,
+            volume_24h: coin.total_volume || 0
+          }));
+        } else {
+          console.log('⚠️ [COINGECKO MCP] Unexpected data format for trending coins:', typeof data);
+          return this.getFallbackTrendingCoins();
+        }
       }
     } catch (error) {
       console.log('⚠️ [COINGECKO MCP] Error getting trending coins:', error.message);
@@ -154,20 +179,23 @@ class CoinGeckoMCPClient {
 
     try {
       const result = await this.client.callTool({
-        name: 'get_global_market_data',
-        arguments: {
-          vs_currency: vsCurrency
-        }
+        name: 'get_global',
+        arguments: {}
       });
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
-        return {
-          total_market_cap: data.total_market_cap?.usd || 0,
-          total_volume_24h: data.total_volume?.usd || 0,
-          market_cap_percentage: data.market_cap_percentage || {},
-          market_cap_change_percentage_24h_usd: data.market_cap_change_percentage_24h_usd || 0
-        };
+        if (data && data.data) {
+          return {
+            total_market_cap: data.data.total_market_cap?.usd || 0,
+            total_volume_24h: data.data.total_volume?.usd || 0,
+            market_cap_percentage: data.data.market_cap_percentage || {},
+            market_cap_change_percentage_24h_usd: data.data.market_cap_change_percentage_24h?.usd || 0
+          };
+        } else {
+          console.log('⚠️ [COINGECKO MCP] Unexpected global data format:', typeof data);
+          return this.getFallbackGlobalData();
+        }
       }
     } catch (error) {
       console.log('⚠️ [COINGECKO MCP] Error getting global market data:', error.message);
