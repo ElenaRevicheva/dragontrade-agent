@@ -475,18 +475,24 @@ class AuthenticCMCEngine {
   }
 
   async getCMCData() {
-    console.log('🔍 [CMC] Starting CoinMarketCap API fetch...');
+    console.log('🔍 [DATA] Starting market data fetch...');
+    
+    // Prioritize CoinGecko MCP as primary data source
+    console.log('🔗 [COINGECKO] Trying CoinGecko MCP first...');
+    const coinGeckoData = await this.coinGeckoEngine.getRealCoinGeckoData();
+    if (coinGeckoData) {
+      console.log('✅ [COINGECKO] Using CoinGecko MCP data as primary source');
+      return this.processCoinGeckoData(coinGeckoData);
+    }
+    
+    // Fallback to CMC if CoinGecko fails
     const apiKey = this.apiKeys.coinmarketcap;
+    console.log('🔑 [CMC] CoinGecko failed, trying CMC API...');
     console.log('🔑 [CMC] API Key status:', apiKey ? `✅ SET (length: ${apiKey.length})` : '❌ NOT SET');
     
-    // Try CoinGecko MCP first if CMC is not available
     if (!apiKey) {
-      console.log('🔗 [COINGECKO] CMC API key not found, trying CoinGecko MCP...');
-      const coinGeckoData = await this.coinGeckoEngine.getRealCoinGeckoData();
-      if (coinGeckoData) {
-        console.log('✅ [COINGECKO] Using CoinGecko MCP data');
-        return this.processCoinGeckoData(coinGeckoData);
-      }
+      console.log('❌ [CMC] No API key found, using last cached data');
+      return this.lastCMCData || this.getEmptyDataStructure();
     }
     
     try {
@@ -655,7 +661,7 @@ class AuthenticCMCEngine {
     if (Math.random() < 0.15) return 'scam_awareness';
     if (Math.random() < 0.10) return 'mcp_enhanced_educational';
     if (Math.random() < 0.08) return 'az_token_educational';
-    if (Math.random() < 0.12) return 'coingecko_enhanced';
+    if (Math.random() < 0.25) return 'coingecko_enhanced';
     if (marketData.top_gainers.length === 0) return 'real_market_snapshot';
     return types[Math.floor(Math.random() * 6)];
   }
@@ -778,7 +784,8 @@ class AuthenticCMCEngine {
     const volumeB = Math.floor(data.total_volume_24h / 1000000000);
     const btc = data.all_coins?.find(c => c.symbol === 'BTC');
     const eth = data.all_coins?.find(c => c.symbol === 'ETH');
-    return `📊 ALGOM MARKET DATA REPORT:\n\n🟠 BTC: ${btc ? `$${btc.price.toLocaleString()} (${btc.change_24h > 0 ? '+' : ''}${btc.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n🔵 ETH: ${eth ? `$${eth.price.toLocaleString()} (${eth.change_24h > 0 ? '+' : ''}${eth.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n📊 POSITIVE ASSETS: ${data.positive_coins}/${data.total_coins}\n\n🔍 SOURCE: CoinMarketCap API (Live)\n⏰ UPDATED: ${new Date().toLocaleTimeString()}\n\n#RealData #CMCFacts #AlgomReport`;
+    const source = data.source || 'CoinGecko MCP';
+    return `📊 ALGOM MARKET DATA REPORT:\n\n🟠 BTC: ${btc ? `$${btc.price.toLocaleString()} (${btc.change_24h > 0 ? '+' : ''}${btc.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n🔵 ETH: ${eth ? `$${eth.price.toLocaleString()} (${eth.change_24h > 0 ? '+' : ''}${eth.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n📊 POSITIVE ASSETS: ${data.positive_coins}/${data.total_coins}\n\n🔍 SOURCE: ${source} (Live)\n⏰ UPDATED: ${new Date().toLocaleTimeString()}\n\n#RealData #${source.includes('CoinGecko') ? 'CoinGecko' : 'CMC'}Facts #AlgomReport`;
   }
 
   generateRealSentimentMeter(data) {
@@ -789,7 +796,8 @@ class AuthenticCMCEngine {
     const meterBar = this.generateRealMeterBar(realScore);
     const marketCapB = Math.floor(data.total_market_cap / 1000000000);
     const volumeB = Math.floor(data.total_volume_24h / 1000000000);
-    return `📊 ALGOM REAL SENTIMENT METER:\n\n${meterBar}\n🎯 SCORE: ${realScore}/100 ${arrow}\n🧠 STATUS: ${realLabel}\n📊 BASIS: ${data.positive_coins}/${data.total_coins} assets positive\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n\n🔍 METHOD: CoinMarketCap performance ratio\n⏰ UPDATED: Live\n\n#RealSentiment #DataDriven #AlgomMeter`;
+    const source = data.source || 'CoinGecko MCP';
+    return `📊 ALGOM REAL SENTIMENT METER:\n\n${meterBar}\n🎯 SCORE: ${realScore}/100 ${arrow}\n🧠 STATUS: ${realLabel}\n📊 BASIS: ${data.positive_coins}/${data.total_coins} assets positive\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n\n🔍 METHOD: ${source} performance ratio\n⏰ UPDATED: Live\n\n#RealSentiment #DataDriven #AlgomMeter`;
   }
 
   generateRealMeterBar(score) {
@@ -802,7 +810,8 @@ class AuthenticCMCEngine {
     const marketCapB = Math.floor(data.total_market_cap / 1000000000);
     const volumeB = Math.floor(data.total_volume_24h / 1000000000);
     const btcDom = data.btc_dominance.toFixed(1);
-    return `📸 ALGOM MARKET SNAPSHOT:\n\n💰 TOTAL MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n🟠 BTC DOMINANCE: ${btcDom}%\n📊 SENTIMENT: ${data.market_sentiment.toUpperCase()}\n✅ POSITIVE: ${data.positive_coins} assets\n❌ NEGATIVE: ${data.total_coins - data.positive_coins} assets\n\n🔍 DATA: CoinMarketCap (${data.total_coins} assets tracked)\n⏰ TIMESTAMP: ${new Date().toLocaleTimeString()}\n\n#MarketSnapshot #RealData #CMCLive`;
+    const source = data.source || 'CoinGecko MCP';
+    return `📸 ALGOM MARKET SNAPSHOT:\n\n💰 TOTAL MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n🟠 BTC DOMINANCE: ${btcDom}%\n📊 SENTIMENT: ${data.market_sentiment.toUpperCase()}\n✅ POSITIVE: ${data.positive_coins} assets\n❌ NEGATIVE: ${data.total_coins - data.positive_coins} assets\n\n🔍 DATA: ${source} (${data.total_coins} assets tracked)\n⏰ TIMESTAMP: ${new Date().toLocaleTimeString()}\n\n#MarketSnapshot #RealData #${source.includes('CoinGecko') ? 'CoinGecko' : 'CMC'}Live`;
   }
 
   generateRealVolumeReport(data) {
