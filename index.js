@@ -13,8 +13,8 @@ dotenv.config();
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
-process.env.POST_INTERVAL_MIN = '10';
-process.env.POST_INTERVAL_MAX = '30';
+process.env.POST_INTERVAL_MIN = '3';
+process.env.POST_INTERVAL_MAX = '10';
 process.env.TWITTER_POLL_INTERVAL = '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
@@ -863,8 +863,8 @@ class AuthenticTwitterClient {
       lastPost: 0,
       postsToday: 0,
       resetTime: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
-      minInterval: 5 * 60 * 1000, // 5 minutes minimum between posts (Premium+ optimized)
-      maxDailyPosts: 100, // Premium+ daily limit (much higher than free)
+      minInterval: 2 * 60 * 1000, // 2 minutes minimum between posts (Basic plan optimized)
+      maxDailyPosts: 500, // Basic plan daily limit (15K posts/month = ~500/day)
       consecutiveFailures: 0,
       lastFailureTime: 0,
       isPaused: false,
@@ -889,7 +889,7 @@ class AuthenticTwitterClient {
       console.log('🐉 Connected as:', user.data.username);
       console.log('👑 Display name:', user.data.name);
       console.log('🏆 Mission: 100% authentic crypto data + Quality reposts + Education');
-      console.log('💎 PREMIUM+ MODE: Full rate limit potential unlocked!');
+      console.log('💎 BASIC PLAN MODE: Full rate limit potential unlocked!');
       console.log('🔗 COINGECKO MCP: Real-time API integration active!');
       
       this.isActive = true;
@@ -1157,27 +1157,27 @@ class AuthenticTwitterClient {
       console.log('🔄 [RATE LIMIT] Daily counter reset');
     }
     
-    // Check for too many consecutive failures - trigger pause (Premium+ optimized)
-    if (this.rateLimitTracker.consecutiveFailures >= 5) {
-      // Pause for 30 minutes after 5 consecutive failures (much shorter for Premium+)
+    // Check for too many consecutive failures - trigger pause (Basic plan optimized)
+    if (this.rateLimitTracker.consecutiveFailures >= 10) {
+      // Pause for 15 minutes after 10 consecutive failures (much shorter for Basic plan)
       this.rateLimitTracker.isPaused = true;
-      this.rateLimitTracker.pauseUntil = now + (30 * 60 * 1000); // 30 minutes
-      console.log(`🚫 [RATE LIMIT] 5+ consecutive failures detected, pausing bot for 30 minutes (Premium+ mode)`);
+      this.rateLimitTracker.pauseUntil = now + (15 * 60 * 1000); // 15 minutes
+      console.log(`🚫 [RATE LIMIT] 10+ consecutive failures detected, pausing bot for 15 minutes (Basic plan mode)`);
       return false;
     }
     
-    // Check minimum interval between posts (5 minutes for Premium+)
+    // Check minimum interval between posts (2 minutes for Basic plan)
     const timeSinceLastPost = now - this.rateLimitTracker.lastPost;
     
     if (timeSinceLastPost < this.rateLimitTracker.minInterval) {
       const waitMinutes = Math.ceil((this.rateLimitTracker.minInterval - timeSinceLastPost) / 60000);
-      console.log(`⏰ [RATE LIMIT] Too soon to post, waiting ${waitMinutes} minutes (Premium+ mode)`);
+      console.log(`⏰ [RATE LIMIT] Too soon to post, waiting ${waitMinutes} minutes (Basic plan mode)`);
       return false;
     }
     
-    // Check daily post limit (100 posts for Premium+)
+    // Check daily post limit (500 posts for Basic plan)
     if (this.rateLimitTracker.postsToday >= this.rateLimitTracker.maxDailyPosts) {
-      console.log(`🚫 [RATE LIMIT] Daily post limit reached (${this.rateLimitTracker.maxDailyPosts} posts) - Premium+ limit`);
+      console.log(`🚫 [RATE LIMIT] Daily post limit reached (${this.rateLimitTracker.maxDailyPosts} posts) - Basic plan limit`);
       return false;
     }
     
@@ -1218,21 +1218,21 @@ class AuthenticTwitterClient {
         this.rateLimitTracker.lastFailureTime = Date.now();
         
         if (error.code === 429) {
-          // Rate limit hit - use Premium+ optimized backoff
-          const baseBackoff = Math.min(Math.pow(2, attempt), 15); // Max 15 minutes for Premium+
-          const consecutiveMultiplier = Math.min(this.rateLimitTracker.consecutiveFailures, 3);
+          // Rate limit hit - use Basic plan optimized backoff
+          const baseBackoff = Math.min(Math.pow(2, attempt), 8); // Max 8 minutes for Basic plan
+          const consecutiveMultiplier = Math.min(this.rateLimitTracker.consecutiveFailures, 2);
           const backoffMinutes = baseBackoff * consecutiveMultiplier;
           
-          console.log(`⏰ [RATE LIMIT] Backing off for ${backoffMinutes} minutes (consecutive failures: ${this.rateLimitTracker.consecutiveFailures}) - Premium+ mode`);
+          console.log(`⏰ [RATE LIMIT] Backing off for ${backoffMinutes} minutes (consecutive failures: ${this.rateLimitTracker.consecutiveFailures}) - Basic plan mode`);
           
           if (attempt < maxRetries) {
             // Wait before next attempt
             await new Promise(resolve => setTimeout(resolve, backoffMinutes * 60 * 1000));
           } else {
             console.log('🚫 [RATE LIMIT] Max retries reached, skipping this post');
-            // Increase minimum interval after consecutive failures (Premium+ optimized)
-            this.rateLimitTracker.minInterval = Math.min(this.rateLimitTracker.minInterval * 1.2, 30 * 60 * 1000);
-            console.log(`⏰ [RATE LIMIT] Increased minimum interval to ${this.rateLimitTracker.minInterval / 60000} minutes (Premium+ mode)`);
+            // Increase minimum interval after consecutive failures (Basic plan optimized)
+            this.rateLimitTracker.minInterval = Math.min(this.rateLimitTracker.minInterval * 1.1, 15 * 60 * 1000);
+            console.log(`⏰ [RATE LIMIT] Increased minimum interval to ${this.rateLimitTracker.minInterval / 60000} minutes (Basic plan mode)`);
             return null;
           }
         } else if (error.code === 403) {
@@ -1240,9 +1240,9 @@ class AuthenticTwitterClient {
           console.log('🚫 [FORBIDDEN] Content may be inappropriate, skipping');
           return null;
         } else {
-          // Other errors - wait shorter time for Premium+
-          const waitTime = Math.min(attempt * 5, 30) * 60 * 1000; // 5-30 minutes
-          console.log(`⏰ [ERROR] Waiting ${waitTime/60000} minutes before retry... (Premium+ mode)`);
+          // Other errors - wait shorter time for Basic plan
+          const waitTime = Math.min(attempt * 3, 15) * 60 * 1000; // 3-15 minutes
+          console.log(`⏰ [ERROR] Waiting ${waitTime/60000} minutes before retry... (Basic plan mode)`);
           
           if (attempt < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -1463,10 +1463,10 @@ async function main() {
     console.log('🐉 ALGOM STATUS:', status.main, authenticTwitter.isActive ? '🔥' : '❌');
     console.log('📱 Account: @reviceva');
     console.log('🏆 Mission: 100% authentic crypto data + Quality reposts + Education');
-    console.log('⚡ Frequency: Every 10-30 minutes (Premium+ optimized)');
+    console.log('⚡ Frequency: Every 3-10 minutes (Basic plan optimized)');
     console.log('🔄 Reposts: 2-hour cooldown, 50+ quality score');
     console.log('🎓 Education: Trading psychology, risk management, scam awareness');
-    console.log('💎 Premium+ Limits: 100 posts/day, 5-min minimum intervals');
+    console.log('💎 Basic Plan Limits: 500 posts/day, 2-min minimum intervals');
     console.log('🔗 CoinGecko MCP: Real-time API + Enhanced educational content');
     console.log('🧠 Intelligence: Real CMC API + CoinGecko MCP + Advanced market psychology');
     console.log('📊 Features: Facts only + Zero predictions + Complete transparency');
