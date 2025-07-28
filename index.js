@@ -664,16 +664,20 @@ class AuthenticCMCEngine {
     if (this.postCounter % 5 === 0) return 'real_sentiment_meter';
     const positiveRatio = marketData.positive_coins / marketData.total_coins;
     if (positiveRatio > 0.8 || positiveRatio < 0.2) {
-      return Math.random() < 0.4 ? 'market_psychology_insight' : 'real_sentiment_meter';
+      // Give AZ Token and CoinGecko content higher priority even during extreme conditions
+      if (Math.random() < 0.25) return 'az_token_educational';
+      if (Math.random() < 0.20) return 'coingecko_enhanced';
+      if (Math.random() < 0.15) return 'az_token_with_market_data';
+      return Math.random() < 0.3 ? 'market_psychology_insight' : 'real_sentiment_meter';
     }
     if (marketData.total_volume_24h > 100000000000 && Math.random() < 0.3) {
       return 'risk_management_tip';
     }
     if (Math.random() < 0.15) return 'scam_awareness';
     if (Math.random() < 0.10) return 'mcp_enhanced_educational';
-    if (Math.random() < 0.15) return 'az_token_educational';
-    if (Math.random() < 0.10) return 'az_token_with_market_data';
-    if (Math.random() < 0.25) return 'coingecko_enhanced';
+    if (Math.random() < 0.25) return 'az_token_educational';
+    if (Math.random() < 0.20) return 'az_token_with_market_data';
+    if (Math.random() < 0.30) return 'coingecko_enhanced';
     if (marketData.top_gainers.length === 0) return 'real_market_snapshot';
     return types[Math.floor(Math.random() * 6)];
   }
