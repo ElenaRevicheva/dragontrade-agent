@@ -7,6 +7,7 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { EducationalMCP } from './educational-mcp-simple.js';
 import { CoinGeckoMCPClient } from './coingecko-mcp-client.js';
+import { AZTokenIntegration } from './az-token-integration.js';
 
 dotenv.config();
 
@@ -30,8 +31,10 @@ class CryptoEducationEngine {
     this.educationalTopics = ['risk_management', 'position_sizing', 'dollar_cost_averaging', 'market_psychology', 'scam_detection', 'technical_analysis', 'fundamental_analysis', 'portfolio_allocation'];
     this.educationalMCP = new EducationalMCP();
     this.coinGeckoMCP = new CoinGeckoMCPClient();
+    this.azTokenIntegration = new AZTokenIntegration();
     this.mcpInitialized = false;
     this.coinGeckoInitialized = false;
+    this.azTokenInitialized = false;
   }
 
   async initializeMCP() {
@@ -52,6 +55,16 @@ class CryptoEducationEngine {
         console.log('🔗 CoinGecko MCP integrated with CryptoEducationEngine');
       } catch (error) {
         console.log('⚠️ CoinGecko MCP fallback mode activated');
+      }
+    }
+
+    if (!this.azTokenInitialized) {
+      try {
+        await this.azTokenIntegration.initialize();
+        this.azTokenInitialized = true;
+        console.log('💎 AZ Token integration activated with CryptoEducationEngine');
+      } catch (error) {
+        console.log('⚠️ AZ Token integration fallback mode activated');
       }
     }
   }
@@ -162,19 +175,17 @@ class CryptoEducationEngine {
   async generateAZTokenEducationalPost(marketData) {
     await this.initializeMCP();
     
-    if (this.mcpInitialized) {
+    if (this.azTokenInitialized) {
       try {
-        const azContent = await this.educationalMCP.getAZTokenEducationalContent();
-        const marketInsight = await this.educationalMCP.getMarketEducationInsight();
-        
-        return `${marketInsight}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${azContent}\n\n🔗 Join the Educational Revolution\n📚 CoinGecko MCP + AZ Token + Real Learning`;
+        const azContent = await this.azTokenIntegration.getRandomAZTokenContent();
+        return azContent.content;
       } catch (error) {
-        console.log('⚠️ AZ token educational content failed, using fallback');
+        console.log('⚠️ AZ Token content generation failed, using fallback');
       }
     }
     
-    // Fallback to original scam alert
-    return this.generateScamAlert(marketData).content;
+    // Fallback content
+    return `🎓 AZ TOKEN EDUCATIONAL INSIGHT:\n\n💎 WHAT IS AZ TOKEN?\n• ERC20 token on Polygon network\n• Learn-to-earn utility token\n• Educational engagement rewards\n• Community-driven growth\n\n💡 UTILITY FEATURES:\n• Educational content rewards\n• Community participation incentives\n• Knowledge sharing benefits\n• Learning achievement tokens\n\n🌐 ECOSYSTEM:\n• Polygon network (low fees)\n• QuickSwap DEX integration\n• Thirdweb deployment\n• Community governance ready\n\n🔗 CONTRACT: 0x5F9cdccA7cE46198fad277A5914E7D545cb3afc5\n💎 TRADE: https://dapp.quickswap.exchange/swap/v3/ETH/0x5F9cdccA7cE46198fad277A5914E7D545cb3afc5\n\n#AZToken #Education #LearnToEarn #Polygon #DeFi`;
   }
 
   // Method to enhance existing posts with MCP and AZ token integration
@@ -660,7 +671,8 @@ class AuthenticCMCEngine {
     }
     if (Math.random() < 0.15) return 'scam_awareness';
     if (Math.random() < 0.10) return 'mcp_enhanced_educational';
-    if (Math.random() < 0.08) return 'az_token_educational';
+    if (Math.random() < 0.15) return 'az_token_educational';
+    if (Math.random() < 0.10) return 'az_token_with_market_data';
     if (Math.random() < 0.25) return 'coingecko_enhanced';
     if (marketData.top_gainers.length === 0) return 'real_market_snapshot';
     return types[Math.floor(Math.random() * 6)];
@@ -692,6 +704,8 @@ class AuthenticCMCEngine {
         return await this.generateMCPEnhancedEducationalPost(insight.data);
       case 'az_token_educational':
         return await this.generateAZTokenEducationalPost(insight.data);
+      case 'az_token_with_market_data':
+        return await this.generateAZTokenWithMarketData(insight.data);
       case 'coingecko_enhanced':
         return await this.generateCoinGeckoEnhancedPost(insight.data);
       default:
@@ -776,6 +790,16 @@ class AuthenticCMCEngine {
     } catch (error) {
       console.log('⚠️ CoinGecko enhanced post failed, using fallback');
       return this.generateRealDataReport(data);
+    }
+  }
+
+  async generateAZTokenWithMarketData(data) {
+    try {
+      const azContent = await this.analysisEngine.educationEngine.azTokenIntegration.generateAZTokenWithMarketData(data);
+      return azContent.content;
+    } catch (error) {
+      console.log('⚠️ AZ Token with market data failed, using fallback');
+      return this.generateAZTokenEducationalPost(data);
     }
   }
 
