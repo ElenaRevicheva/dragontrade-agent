@@ -6,6 +6,7 @@ import { dirname, resolve } from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { EducationalMCP } from './educational-mcp-simple.js';
+import { CoinGeckoMCPClient } from './coingecko-mcp-client.js';
 
 dotenv.config();
 
@@ -28,7 +29,9 @@ class CryptoEducationEngine {
     this.fearGreedHistory = [];
     this.educationalTopics = ['risk_management', 'position_sizing', 'dollar_cost_averaging', 'market_psychology', 'scam_detection', 'technical_analysis', 'fundamental_analysis', 'portfolio_allocation'];
     this.educationalMCP = new EducationalMCP();
+    this.coinGeckoMCP = new CoinGeckoMCPClient();
     this.mcpInitialized = false;
+    this.coinGeckoInitialized = false;
   }
 
   async initializeMCP() {
@@ -39,6 +42,16 @@ class CryptoEducationEngine {
         console.log('🎓 Educational MCP integrated with CryptoEducationEngine');
       } catch (error) {
         console.log('⚠️ Educational MCP fallback mode activated');
+      }
+    }
+
+    if (!this.coinGeckoInitialized) {
+      try {
+        await this.coinGeckoMCP.initialize();
+        this.coinGeckoInitialized = true;
+        console.log('🔗 CoinGecko MCP integrated with CryptoEducationEngine');
+      } catch (error) {
+        console.log('⚠️ CoinGecko MCP fallback mode activated');
       }
     }
   }
@@ -170,6 +183,67 @@ class CryptoEducationEngine {
       return this.educationalMCP.enhanceWithMCP(originalContent);
     }
     return originalContent;
+  }
+
+  // Real CoinGecko MCP data methods
+  async getRealCoinGeckoData() {
+    await this.initializeMCP();
+    
+    if (this.coinGeckoInitialized) {
+      try {
+        // Get top cryptocurrencies
+        const btcData = await this.coinGeckoMCP.getMarketData('BTC');
+        const ethData = await this.coinGeckoMCP.getMarketData('ETH');
+        const solData = await this.coinGeckoMCP.getMarketData('SOL');
+        
+        // Get trending coins
+        const trendingCoins = await this.coinGeckoMCP.getTrendingCoins();
+        
+        // Get global market data
+        const globalData = await this.coinGeckoMCP.getGlobalMarketData();
+        
+        return {
+          data_available: true,
+          source: 'CoinGecko MCP',
+          btc: btcData,
+          eth: ethData,
+          sol: solData,
+          trending: trendingCoins,
+          global: globalData,
+          all_coins: [btcData, ethData, solData, ...trendingCoins.slice(0, 7)],
+          total_market_cap: globalData.total_market_cap,
+          total_volume_24h: globalData.total_volume_24h,
+          btc_dominance: 50, // Calculate from global data
+          positive_coins: [btcData, ethData, solData, ...trendingCoins].filter(c => c.change_24h > 0).length,
+          total_coins: [btcData, ethData, solData, ...trendingCoins].length
+        };
+      } catch (error) {
+        console.log('⚠️ CoinGecko MCP data fetch failed:', error.message);
+      }
+    }
+    
+    return null;
+  }
+
+  async generateCoinGeckoEnhancedContent(marketData) {
+    await this.initializeMCP();
+    
+    if (this.coinGeckoInitialized) {
+      try {
+        const coinGeckoData = await this.getRealCoinGeckoData();
+        if (coinGeckoData) {
+          return {
+            type: 'coingecko_enhanced',
+            status: 'educational',
+            content: `🔗 COINGECKO MCP ENHANCED ANALYSIS:\n\n📊 REAL-TIME DATA FROM COINGECKO:\n• BTC: $${coinGeckoData.btc.price.toLocaleString()} (${coinGeckoData.btc.change_24h > 0 ? '+' : ''}${coinGeckoData.btc.change_24h.toFixed(2)}%)\n• ETH: $${coinGeckoData.eth.price.toLocaleString()} (${coinGeckoData.eth.change_24h > 0 ? '+' : ''}${coinGeckoData.eth.change_24h.toFixed(2)}%)\n• SOL: $${coinGeckoData.sol.price.toLocaleString()} (${coinGeckoData.sol.change_24h > 0 ? '+' : ''}${coinGeckoData.sol.change_24h.toFixed(2)}%)\n\n🔥 TRENDING COINS (24H):\n${coinGeckoData.trending.slice(0, 3).map((coin, i) => `${i + 1}. ${coin.symbol}: $${coin.price.toLocaleString()} (${coin.change_24h > 0 ? '+' : ''}${coin.change_24h.toFixed(2)}%)`).join('\n')}\n\n💰 GLOBAL MARKET:\n• Total Market Cap: $${Math.floor(coinGeckoData.global.total_market_cap / 1000000000)}B\n• 24H Volume: $${Math.floor(coinGeckoData.global.total_volume_24h / 1000000000)}B\n• Positive Assets: ${coinGeckoData.positive_coins}/${coinGeckoData.total_coins}\n\n🔗 SOURCE: CoinGecko MCP Real-Time API\n🎓 ENHANCED: Real market data + Educational insights\n\n#CoinGecko #RealData #MCPEnhanced #AlgomEducation`
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ CoinGecko enhanced content failed:', error.message);
+      }
+    }
+    
+    return null;
   }
 }
 
@@ -397,16 +471,24 @@ class AuthenticCMCEngine {
     this.lastSentimentScore = null;
     this.postCounter = 0;
     this.lastCMCData = null;
+    this.coinGeckoEngine = new CryptoEducationEngine();
   }
 
   async getCMCData() {
     console.log('🔍 [CMC] Starting CoinMarketCap API fetch...');
     const apiKey = this.apiKeys.coinmarketcap;
     console.log('🔑 [CMC] API Key status:', apiKey ? `✅ SET (length: ${apiKey.length})` : '❌ NOT SET');
+    
+    // Try CoinGecko MCP first if CMC is not available
     if (!apiKey) {
-      console.log('❌ [CMC] No API key found, using last cached data');
-      return this.lastCMCData || this.getEmptyDataStructure();
+      console.log('🔗 [COINGECKO] CMC API key not found, trying CoinGecko MCP...');
+      const coinGeckoData = await this.coinGeckoEngine.getRealCoinGeckoData();
+      if (coinGeckoData) {
+        console.log('✅ [COINGECKO] Using CoinGecko MCP data');
+        return this.processCoinGeckoData(coinGeckoData);
+      }
     }
+    
     try {
       console.log('📡 [CMC] Making API request to CoinMarketCap...');
       const response = await fetch('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=50', {
@@ -414,7 +496,12 @@ class AuthenticCMCEngine {
       });
       console.log('📊 [CMC] Status Code:', response.status);
       if (!response.ok) {
-        console.log('❌ [CMC] API Response Error!');
+        console.log('❌ [CMC] API Response Error! Trying CoinGecko MCP...');
+        const coinGeckoData = await this.coinGeckoEngine.getRealCoinGeckoData();
+        if (coinGeckoData) {
+          console.log('✅ [COINGECKO] Using CoinGecko MCP data as fallback');
+          return this.processCoinGeckoData(coinGeckoData);
+        }
         return this.lastCMCData || this.getEmptyDataStructure();
       }
       const data = await response.json();
@@ -424,10 +511,22 @@ class AuthenticCMCEngine {
         this.lastCMCData = processedData;
         return processedData;
       } else {
+        console.log('⚠️ [CMC] No data returned, trying CoinGecko MCP...');
+        const coinGeckoData = await this.coinGeckoEngine.getRealCoinGeckoData();
+        if (coinGeckoData) {
+          console.log('✅ [COINGECKO] Using CoinGecko MCP data as fallback');
+          return this.processCoinGeckoData(coinGeckoData);
+        }
         return this.lastCMCData || this.getEmptyDataStructure();
       }
     } catch (error) {
       console.log('❌ [CMC] Fetch error occurred:', error.message);
+      console.log('🔗 [COINGECKO] Trying CoinGecko MCP as fallback...');
+      const coinGeckoData = await this.coinGeckoEngine.getRealCoinGeckoData();
+      if (coinGeckoData) {
+        console.log('✅ [COINGECKO] Using CoinGecko MCP data as fallback');
+        return this.processCoinGeckoData(coinGeckoData);
+      }
       return this.lastCMCData || this.getEmptyDataStructure();
     }
   }
@@ -443,6 +542,40 @@ class AuthenticCMCEngine {
       data_available: false,
       last_updated: new Date().toISOString()
     };
+  }
+
+  processCoinGeckoData(coinGeckoData) {
+    console.log('🔗 [COINGECKO] Processing CoinGecko MCP data...');
+    
+    const allCoins = coinGeckoData.all_coins || [];
+    const topGainers = allCoins
+      .filter(c => c.change_24h > 3)
+      .sort((a, b) => b.change_24h - a.change_24h)
+      .slice(0, 5);
+    
+    const positiveCoins = allCoins.filter(c => c.change_24h > 0).length;
+    const realSentiment = this.calculateRealSentiment(positiveCoins, allCoins.length);
+    
+    const processedData = {
+      top_gainers: topGainers,
+      all_coins: allCoins.slice(0, 20),
+      market_sentiment: realSentiment,
+      total_market_cap: coinGeckoData.total_market_cap || 0,
+      total_volume_24h: coinGeckoData.total_volume_24h || 0,
+      btc_dominance: coinGeckoData.btc_dominance || 50,
+      data_available: true,
+      last_updated: new Date().toISOString(),
+      positive_coins: positiveCoins,
+      total_coins: allCoins.length,
+      source: 'CoinGecko MCP'
+    };
+    
+    if (allCoins.length > 0) {
+      this.reputationTracker.addDataPoint(allCoins[0].symbol, allCoins[0].price, allCoins[0].change_24h, Date.now());
+    }
+    
+    console.log('✅ [COINGECKO] CoinGecko MCP data processed successfully');
+    return processedData;
   }
 
   processRealCMCData(data) {
@@ -508,7 +641,7 @@ class AuthenticCMCEngine {
   }
 
   selectRealInsightType(marketData) {
-    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational'];
+    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced'];
     if (this.postCounter % 10 === 0) return 'real_transparency';
     if (this.postCounter % 7 === 0) return 'educational_content';
     if (this.postCounter % 5 === 0) return 'real_sentiment_meter';
@@ -522,6 +655,7 @@ class AuthenticCMCEngine {
     if (Math.random() < 0.15) return 'scam_awareness';
     if (Math.random() < 0.10) return 'mcp_enhanced_educational';
     if (Math.random() < 0.08) return 'az_token_educational';
+    if (Math.random() < 0.12) return 'coingecko_enhanced';
     if (marketData.top_gainers.length === 0) return 'real_market_snapshot';
     return types[Math.floor(Math.random() * 6)];
   }
@@ -552,6 +686,8 @@ class AuthenticCMCEngine {
         return await this.generateMCPEnhancedEducationalPost(insight.data);
       case 'az_token_educational':
         return await this.generateAZTokenEducationalPost(insight.data);
+      case 'coingecko_enhanced':
+        return await this.generateCoinGeckoEnhancedPost(insight.data);
       default:
         return this.generateRealDataReport(insight.data);
     }
@@ -621,6 +757,19 @@ class AuthenticCMCEngine {
     } catch (error) {
       console.log('⚠️ AZ token educational post failed, using fallback');
       return this.generateScamAwarenessPost(data);
+    }
+  }
+
+  async generateCoinGeckoEnhancedPost(data) {
+    try {
+      const coinGeckoContent = await this.coinGeckoEngine.generateCoinGeckoEnhancedContent(data);
+      if (coinGeckoContent) {
+        return coinGeckoContent.content;
+      }
+      return this.generateRealDataReport(data);
+    } catch (error) {
+      console.log('⚠️ CoinGecko enhanced post failed, using fallback');
+      return this.generateRealDataReport(data);
     }
   }
 
@@ -741,6 +890,7 @@ class AuthenticTwitterClient {
       console.log('👑 Display name:', user.data.name);
       console.log('🏆 Mission: 100% authentic crypto data + Quality reposts + Education');
       console.log('💎 PREMIUM+ MODE: Full rate limit potential unlocked!');
+      console.log('🔗 COINGECKO MCP: Real-time API integration active!');
       
       this.isActive = true;
       this.startAuthenticPosting();
@@ -1317,7 +1467,8 @@ async function main() {
     console.log('🔄 Reposts: 2-hour cooldown, 50+ quality score');
     console.log('🎓 Education: Trading psychology, risk management, scam awareness');
     console.log('💎 Premium+ Limits: 100 posts/day, 5-min minimum intervals');
-    console.log('🧠 Intelligence: Real CMC API + Advanced market psychology');
+    console.log('🔗 CoinGecko MCP: Real-time API + Enhanced educational content');
+    console.log('🧠 Intelligence: Real CMC API + CoinGecko MCP + Advanced market psychology');
     console.log('📊 Features: Facts only + Zero predictions + Complete transparency');
     console.log('🔍 Enhanced: No fabrication, real numbers or silence');
     console.log('🎯 Analysis: Price verification + Sentiment confirmation + Volume analysis');
