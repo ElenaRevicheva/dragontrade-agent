@@ -7,7 +7,10 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { EducationalMCP } from './educational-mcp-simple.js';
 import { CoinGeckoMCPClient } from './coingecko-mcp-client.js';
+import { CoinGeckoDirectAPI } from './coingecko-direct-api.js';
 import { AZTokenIntegration } from './az-token-integration.js';
+import { MCPScamDetection } from './mcp-scam-detection.js';
+import { MCPTradingSimulator } from './mcp-trading-simulator.js';
 
 dotenv.config();
 
@@ -31,14 +34,23 @@ class CryptoEducationEngine {
     this.educationalTopics = ['risk_management', 'position_sizing', 'dollar_cost_averaging', 'market_psychology', 'scam_detection', 'technical_analysis', 'fundamental_analysis', 'portfolio_allocation'];
     this.educationalMCP = new EducationalMCP();
     this.coinGeckoMCP = new CoinGeckoMCPClient();
+    this.coinGeckoDirect = new CoinGeckoDirectAPI();
     this.azTokenIntegration = new AZTokenIntegration();
+    
+    // NEW HACKATHON FEATURES
+    this.scamDetection = new MCPScamDetection();
+    this.tradingSimulator = new MCPTradingSimulator();
+    
     this.mcpInitialized = false;
     this.coinGeckoInitialized = false;
+    this.coinGeckoDirectInitialized = false;
     this.azTokenInitialized = false;
+    this.scamDetectionInitialized = false;
+    this.tradingSimulatorInitialized = false;
     
-    // Rate limiting for MCP calls to prevent overwhelming the server
-    this.lastMCPCall = 0;
-    this.mcpCallInterval = 30000; // 30 seconds between MCP calls
+    // Rate limiting for API calls to prevent overwhelming the server
+    this.lastAPICall = 0;
+    this.apiCallInterval = 2000; // 2 seconds between API calls (30 RPM limit)
   }
 
   async initializeMCP() {
@@ -52,13 +64,30 @@ class CryptoEducationEngine {
       }
     }
 
-    if (!this.coinGeckoInitialized) {
+    // Prioritize direct API over MCP
+    if (!this.coinGeckoDirectInitialized) {
       try {
-        console.log('🔗 [COINGECKO MCP] Attempting to initialize with enhanced timeout handling...');
+        console.log('🔗 [COINGECKO API] Attempting to initialize direct API client...');
+        const success = await this.coinGeckoDirect.initialize();
+        if (success) {
+          this.coinGeckoDirectInitialized = true;
+          console.log('✅ CoinGecko Direct API integrated with CryptoEducationEngine');
+        } else {
+          console.log('⚠️ CoinGecko Direct API fallback mode activated - connection failed');
+        }
+      } catch (error) {
+        console.log('⚠️ CoinGecko Direct API fallback mode activated:', error.message);
+      }
+    }
+
+    // Fallback to MCP if direct API fails
+    if (!this.coinGeckoDirectInitialized && !this.coinGeckoInitialized) {
+      try {
+        console.log('🔗 [COINGECKO MCP] Attempting to initialize MCP client as fallback...');
         const success = await this.coinGeckoMCP.initialize();
         if (success) {
-          this.coinGeckoInitialized = true;
-          console.log('✅ CoinGecko MCP integrated with CryptoEducationEngine');
+        this.coinGeckoInitialized = true;
+          console.log('✅ CoinGecko MCP integrated with CryptoEducationEngine (fallback)');
         } else {
           console.log('⚠️ CoinGecko MCP fallback mode activated - connection failed');
         }
@@ -74,6 +103,27 @@ class CryptoEducationEngine {
         console.log('💎 AZ Token integration activated with CryptoEducationEngine');
       } catch (error) {
         console.log('⚠️ AZ Token integration fallback mode activated:', error.message);
+      }
+    }
+
+    // Initialize NEW HACKATHON FEATURES
+    if (!this.scamDetectionInitialized) {
+      try {
+        await this.scamDetection.initialize();
+        this.scamDetectionInitialized = true;
+        console.log('🚨 Advanced scam detection engine activated');
+      } catch (error) {
+        console.log('⚠️ Scam detection fallback mode activated:', error.message);
+      }
+    }
+
+    if (!this.tradingSimulatorInitialized) {
+      try {
+        await this.tradingSimulator.initialize();
+        this.tradingSimulatorInitialized = true;
+        console.log('🎮 Interactive trading simulator activated');
+      } catch (error) {
+        console.log('⚠️ Trading simulator fallback mode activated:', error.message);
       }
     }
   }
@@ -205,71 +255,170 @@ class CryptoEducationEngine {
     return originalContent;
   }
 
-  // Real CoinGecko MCP data methods with enhanced error handling and rate limiting
+  // Real CoinGecko API data methods with enhanced error handling and rate limiting
   async getRealCoinGeckoData() {
     await this.initializeMCP();
     
-    // Rate limiting check to prevent overwhelming the MCP server
+    // Rate limiting check to prevent overwhelming the API server
     const now = Date.now();
-    if (now - this.lastMCPCall < this.mcpCallInterval) {
-      console.log('⏰ [COINGECKO MCP] Rate limiting active, skipping MCP call');
+    if (now - this.lastAPICall < this.apiCallInterval) {
+      console.log('⏰ [COINGECKO API] Rate limiting active, skipping API call');
       return null;
     }
     
-    if (this.coinGeckoInitialized) {
+    // Prioritize direct API over MCP
+    if (this.coinGeckoDirectInitialized) {
       try {
         // Check connection health first
-        const isHealthy = await this.coinGeckoMCP.checkConnectionHealth();
+        const isHealthy = await this.coinGeckoDirect.checkConnectionHealth();
         if (!isHealthy) {
-          console.log('🔄 [COINGECKO MCP] Connection unhealthy, attempting reconnection...');
-          this.coinGeckoInitialized = false;
+          console.log('🔄 [COINGECKO API] Connection unhealthy, attempting reconnection...');
+          this.coinGeckoDirectInitialized = false;
           await this.initializeMCP();
-          if (!this.coinGeckoInitialized) {
-            console.log('⚠️ [COINGECKO MCP] Reconnection failed, using fallback data');
+          if (!this.coinGeckoDirectInitialized) {
+            console.log('⚠️ [COINGECKO API] Reconnection failed, trying MCP fallback');
+            // Fall back to MCP
+    if (this.coinGeckoInitialized) {
+              return this.getDataFromMCP();
+            }
             return null;
           }
         }
         
         // Update last call time
-        this.lastMCPCall = now;
+        this.lastAPICall = now;
 
         // Get top cryptocurrencies with individual error handling
         let btcData, ethData, solData, trendingCoins, globalData;
         
         try {
-          btcData = await this.coinGeckoMCP.getMarketData('BTC');
+          btcData = await this.coinGeckoDirect.getMarketData('BTC');
         } catch (error) {
-          console.log('⚠️ [COINGECKO MCP] BTC data fetch failed:', error.message);
-          btcData = this.coinGeckoMCP.getFallbackMarketData('BTC');
+          console.log('⚠️ [COINGECKO API] BTC data fetch failed:', error.message);
+          btcData = this.coinGeckoDirect.getFallbackMarketData('BTC');
         }
         
         try {
-          ethData = await this.coinGeckoMCP.getMarketData('ETH');
+          ethData = await this.coinGeckoDirect.getMarketData('ETH');
         } catch (error) {
-          console.log('⚠️ [COINGECKO MCP] ETH data fetch failed:', error.message);
-          ethData = this.coinGeckoMCP.getFallbackMarketData('ETH');
+          console.log('⚠️ [COINGECKO API] ETH data fetch failed:', error.message);
+          ethData = this.coinGeckoDirect.getFallbackMarketData('ETH');
         }
         
         try {
-          solData = await this.coinGeckoMCP.getMarketData('SOL');
+          solData = await this.coinGeckoDirect.getMarketData('SOL');
         } catch (error) {
-          console.log('⚠️ [COINGECKO MCP] SOL data fetch failed:', error.message);
-          solData = this.coinGeckoMCP.getFallbackMarketData('SOL');
+          console.log('⚠️ [COINGECKO API] SOL data fetch failed:', error.message);
+          solData = this.coinGeckoDirect.getFallbackMarketData('SOL');
         }
         
         try {
-          trendingCoins = await this.coinGeckoMCP.getTrendingCoins();
+          trendingCoins = await this.coinGeckoDirect.getTopGainersLosers();
         } catch (error) {
-          console.log('⚠️ [COINGECKO MCP] Trending coins fetch failed:', error.message);
-          trendingCoins = this.coinGeckoMCP.getFallbackTrendingCoins();
+          console.log('⚠️ [COINGECKO API] Trending coins fetch failed:', error.message);
+          trendingCoins = this.coinGeckoDirect.getFallbackTrendingCoins();
         }
         
         try {
-          globalData = await this.coinGeckoMCP.getGlobalMarketData();
+          globalData = await this.coinGeckoDirect.getGlobalMarketData();
         } catch (error) {
-          console.log('⚠️ [COINGECKO MCP] Global data fetch failed:', error.message);
-          globalData = this.coinGeckoMCP.getFallbackGlobalData();
+          console.log('⚠️ [COINGECKO API] Global data fetch failed:', error.message);
+          globalData = this.coinGeckoDirect.getFallbackGlobalData();
         }
+        
+        return {
+          data_available: true,
+          source: 'CoinGecko',
+          btc: btcData,
+          eth: ethData,
+          sol: solData,
+          trending: trendingCoins,
+          global: globalData,
+          all_coins: [btcData, ethData, solData, ...trendingCoins.slice(0, 7)],
+          total_market_cap: globalData.total_market_cap,
+          total_volume_24h: globalData.total_volume_24h,
+          btc_dominance: 50, // Calculate from global data
+          positive_coins: [btcData, ethData, solData, ...trendingCoins].filter(c => c.change_24h > 0).length,
+          total_coins: [btcData, ethData, solData, ...trendingCoins].length
+        };
+      } catch (error) {
+        console.log('⚠️ CoinGecko API data fetch failed:', error.message);
+        // Try to reconnect on critical failure
+        this.coinGeckoDirectInitialized = false;
+        
+        // Fall back to MCP if available
+        if (this.coinGeckoInitialized) {
+          console.log('🔄 [COINGECKO] Falling back to MCP client...');
+          return this.getDataFromMCP();
+        }
+      }
+    }
+    
+    // Fall back to MCP if direct API is not available
+    if (this.coinGeckoInitialized) {
+      console.log('🔄 [COINGECKO] Using MCP fallback...');
+      return this.getDataFromMCP();
+    }
+    
+    return null;
+  }
+
+  // MCP fallback method
+  async getDataFromMCP() {
+    if (!this.coinGeckoInitialized) {
+      return null;
+    }
+
+    try {
+      // Check connection health first
+      const isHealthy = await this.coinGeckoMCP.checkConnectionHealth();
+      if (!isHealthy) {
+        console.log('🔄 [COINGECKO MCP] Connection unhealthy, attempting reconnection...');
+        this.coinGeckoInitialized = false;
+        await this.initializeMCP();
+        if (!this.coinGeckoInitialized) {
+          console.log('⚠️ [COINGECKO MCP] Reconnection failed, using fallback data');
+          return null;
+        }
+      }
+
+      // Get top cryptocurrencies with individual error handling
+      let btcData, ethData, solData, trendingCoins, globalData;
+      
+      try {
+        btcData = await this.coinGeckoMCP.getMarketData('BTC');
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] BTC data fetch failed:', error.message);
+        btcData = this.coinGeckoMCP.getFallbackMarketData('BTC');
+      }
+      
+      try {
+        ethData = await this.coinGeckoMCP.getMarketData('ETH');
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] ETH data fetch failed:', error.message);
+        ethData = this.coinGeckoMCP.getFallbackMarketData('ETH');
+      }
+      
+      try {
+        solData = await this.coinGeckoMCP.getMarketData('SOL');
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] SOL data fetch failed:', error.message);
+        solData = this.coinGeckoMCP.getFallbackMarketData('SOL');
+      }
+      
+      try {
+        trendingCoins = await this.coinGeckoMCP.getTrendingCoins();
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] Trending coins fetch failed:', error.message);
+        trendingCoins = this.coinGeckoMCP.getFallbackTrendingCoins();
+      }
+      
+      try {
+        globalData = await this.coinGeckoMCP.getGlobalMarketData();
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] Global data fetch failed:', error.message);
+        globalData = this.coinGeckoMCP.getFallbackGlobalData();
+      }
         
         return {
           data_available: true,
@@ -288,9 +437,8 @@ class CryptoEducationEngine {
         };
       } catch (error) {
         console.log('⚠️ CoinGecko MCP data fetch failed:', error.message);
-        // Try to reconnect on critical failure
-        this.coinGeckoInitialized = false;
-      }
+      // Try to reconnect on critical failure
+      this.coinGeckoInitialized = false;
     }
     
     return null;
@@ -718,10 +866,17 @@ class AuthenticCMCEngine {
   }
 
   selectRealInsightType(marketData) {
-    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced'];
+    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson'];
+    
+    // NEW HACKATHON FEATURES - Higher priority for demo
+    if (this.postCounter % 15 === 0) return 'advanced_scam_detection';
+    if (this.postCounter % 12 === 0) return 'trading_simulation';
+    if (this.postCounter % 9 === 0) return 'personalized_lesson';
+    
     if (this.postCounter % 10 === 0) return 'real_transparency';
     if (this.postCounter % 7 === 0) return 'educational_content';
     if (this.postCounter % 5 === 0) return 'real_sentiment_meter';
+    
     const positiveRatio = marketData.positive_coins / marketData.total_coins;
     if (positiveRatio > 0.8 || positiveRatio < 0.2) {
       // Give AZ Token and CoinGecko content higher priority even during extreme conditions
@@ -772,6 +927,12 @@ class AuthenticCMCEngine {
         return await this.generateAZTokenWithMarketData(insight.data);
       case 'coingecko_enhanced':
         return await this.generateCoinGeckoEnhancedPost(insight.data);
+      case 'advanced_scam_detection':
+        return await this.generateAdvancedScamDetection(insight.data);
+      case 'trading_simulation':
+        return await this.generateTradingSimulation(insight.data);
+      case 'personalized_lesson':
+        return await this.generatePersonalizedLesson(insight.data);
       default:
         return this.generateRealDataReport(insight.data);
     }
@@ -864,6 +1025,73 @@ class AuthenticCMCEngine {
     } catch (error) {
       console.log('⚠️ AZ Token with market data failed, using fallback');
       return this.generateAZTokenEducationalPost(data);
+    }
+  }
+
+  // NEW HACKATHON FEATURES
+  async generateAdvancedScamDetection(data) {
+    try {
+      console.log('🚨 [HACKATHON] Generating advanced scam detection content...');
+      
+      // Create a mock tweet for analysis
+      const mockTweet = {
+        text: '🚀 NEW COIN ALERT! 100x guaranteed returns! Don\'t miss out on this moon shot! Limited time offer!',
+        created_at: new Date().toISOString()
+      };
+
+      const scamAnalysis = await this.analysisEngine.educationEngine.scamDetection.analyzeScamWithMCP(mockTweet, data);
+      const scamAlert = this.analysisEngine.educationEngine.scamDetection.generateScamAlert(scamAnalysis);
+
+      if (scamAlert) {
+        return scamAlert.content;
+      }
+
+      return this.generateScamAwarenessPost(data);
+    } catch (error) {
+      console.log('⚠️ Advanced scam detection failed, using fallback:', error.message);
+      return this.generateScamAwarenessPost(data);
+    }
+  }
+
+  async generateTradingSimulation(data) {
+    try {
+      console.log('🎮 [HACKATHON] Generating trading simulation content...');
+      
+      const simulation = await this.analysisEngine.educationEngine.tradingSimulator.createSimulation('demo_user');
+      const scenario = await this.analysisEngine.educationEngine.tradingSimulator.presentScenario(simulation.id, data);
+
+      if (scenario) {
+        return scenario.content;
+      }
+
+      return this.generateEducationalPost(data);
+    } catch (error) {
+      console.log('⚠️ Trading simulation failed, using fallback:', error.message);
+      return this.generateEducationalPost(data);
+    }
+  }
+
+  async generatePersonalizedLesson(data) {
+    try {
+      console.log('🎓 [HACKATHON] Generating personalized lesson content...');
+      
+      // Mock user behavior for demo
+      const userBehavior = {
+        panicSells: 2,
+        fomoBuys: 3,
+        memeCoinPercentage: 30
+      };
+
+      const lesson = await this.analysisEngine.educationEngine.tradingSimulator.createPersonalizedLesson(userBehavior, data);
+
+      if (lesson) {
+        return lesson.content;
+      }
+
+      return this.generateEducationalPost(data);
+    } catch (error) {
+      console.log('⚠️ Personalized lesson failed, using fallback:', error.message);
+      return this.generateEducationalPost(data);
     }
   }
 
