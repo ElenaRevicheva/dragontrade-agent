@@ -35,6 +35,10 @@ class CryptoEducationEngine {
     this.mcpInitialized = false;
     this.coinGeckoInitialized = false;
     this.azTokenInitialized = false;
+    
+    // Rate limiting for MCP calls to prevent overwhelming the server
+    this.lastMCPCall = 0;
+    this.mcpCallInterval = 30000; // 30 seconds between MCP calls
   }
 
   async initializeMCP() {
@@ -44,17 +48,22 @@ class CryptoEducationEngine {
         this.mcpInitialized = true;
         console.log('🎓 Educational MCP integrated with CryptoEducationEngine');
       } catch (error) {
-        console.log('⚠️ Educational MCP fallback mode activated');
+        console.log('⚠️ Educational MCP fallback mode activated:', error.message);
       }
     }
 
     if (!this.coinGeckoInitialized) {
       try {
-        await this.coinGeckoMCP.initialize();
-        this.coinGeckoInitialized = true;
-        console.log('🔗 CoinGecko MCP integrated with CryptoEducationEngine');
+        console.log('🔗 [COINGECKO MCP] Attempting to initialize with enhanced timeout handling...');
+        const success = await this.coinGeckoMCP.initialize();
+        if (success) {
+          this.coinGeckoInitialized = true;
+          console.log('✅ CoinGecko MCP integrated with CryptoEducationEngine');
+        } else {
+          console.log('⚠️ CoinGecko MCP fallback mode activated - connection failed');
+        }
       } catch (error) {
-        console.log('⚠️ CoinGecko MCP fallback mode activated');
+        console.log('⚠️ CoinGecko MCP fallback mode activated:', error.message);
       }
     }
 
@@ -64,7 +73,7 @@ class CryptoEducationEngine {
         this.azTokenInitialized = true;
         console.log('💎 AZ Token integration activated with CryptoEducationEngine');
       } catch (error) {
-        console.log('⚠️ AZ Token integration fallback mode activated');
+        console.log('⚠️ AZ Token integration fallback mode activated:', error.message);
       }
     }
   }
@@ -196,22 +205,71 @@ class CryptoEducationEngine {
     return originalContent;
   }
 
-  // Real CoinGecko MCP data methods
+  // Real CoinGecko MCP data methods with enhanced error handling and rate limiting
   async getRealCoinGeckoData() {
     await this.initializeMCP();
     
+    // Rate limiting check to prevent overwhelming the MCP server
+    const now = Date.now();
+    if (now - this.lastMCPCall < this.mcpCallInterval) {
+      console.log('⏰ [COINGECKO MCP] Rate limiting active, skipping MCP call');
+      return null;
+    }
+    
     if (this.coinGeckoInitialized) {
       try {
-        // Get top cryptocurrencies
-        const btcData = await this.coinGeckoMCP.getMarketData('BTC');
-        const ethData = await this.coinGeckoMCP.getMarketData('ETH');
-        const solData = await this.coinGeckoMCP.getMarketData('SOL');
+        // Check connection health first
+        const isHealthy = await this.coinGeckoMCP.checkConnectionHealth();
+        if (!isHealthy) {
+          console.log('🔄 [COINGECKO MCP] Connection unhealthy, attempting reconnection...');
+          this.coinGeckoInitialized = false;
+          await this.initializeMCP();
+          if (!this.coinGeckoInitialized) {
+            console.log('⚠️ [COINGECKO MCP] Reconnection failed, using fallback data');
+            return null;
+          }
+        }
         
-        // Get trending coins
-        const trendingCoins = await this.coinGeckoMCP.getTrendingCoins();
+        // Update last call time
+        this.lastMCPCall = now;
+
+        // Get top cryptocurrencies with individual error handling
+        let btcData, ethData, solData, trendingCoins, globalData;
         
-        // Get global market data
-        const globalData = await this.coinGeckoMCP.getGlobalMarketData();
+        try {
+          btcData = await this.coinGeckoMCP.getMarketData('BTC');
+        } catch (error) {
+          console.log('⚠️ [COINGECKO MCP] BTC data fetch failed:', error.message);
+          btcData = this.coinGeckoMCP.getFallbackMarketData('BTC');
+        }
+        
+        try {
+          ethData = await this.coinGeckoMCP.getMarketData('ETH');
+        } catch (error) {
+          console.log('⚠️ [COINGECKO MCP] ETH data fetch failed:', error.message);
+          ethData = this.coinGeckoMCP.getFallbackMarketData('ETH');
+        }
+        
+        try {
+          solData = await this.coinGeckoMCP.getMarketData('SOL');
+        } catch (error) {
+          console.log('⚠️ [COINGECKO MCP] SOL data fetch failed:', error.message);
+          solData = this.coinGeckoMCP.getFallbackMarketData('SOL');
+        }
+        
+        try {
+          trendingCoins = await this.coinGeckoMCP.getTrendingCoins();
+        } catch (error) {
+          console.log('⚠️ [COINGECKO MCP] Trending coins fetch failed:', error.message);
+          trendingCoins = this.coinGeckoMCP.getFallbackTrendingCoins();
+        }
+        
+        try {
+          globalData = await this.coinGeckoMCP.getGlobalMarketData();
+        } catch (error) {
+          console.log('⚠️ [COINGECKO MCP] Global data fetch failed:', error.message);
+          globalData = this.coinGeckoMCP.getFallbackGlobalData();
+        }
         
         return {
           data_available: true,
@@ -230,6 +288,8 @@ class CryptoEducationEngine {
         };
       } catch (error) {
         console.log('⚠️ CoinGecko MCP data fetch failed:', error.message);
+        // Try to reconnect on critical failure
+        this.coinGeckoInitialized = false;
       }
     }
     
@@ -1534,13 +1594,32 @@ async function main() {
       console.log('\n⚠️ Authentic activation pending...');
     }
     
-    // Monitor authentic activity with enhanced education metrics
+    // Monitor authentic activity with enhanced education metrics and MCP health checks
     let minutes = 0;
-    setInterval(() => {
+    setInterval(async () => {
       minutes++;
       const status = authenticTwitter.getStatus();
       
       console.log(`[${new Date().toISOString()}] 🐉 AUTHENTIC ALGOM: ${minutes}min | Status: ${status.main} | Posts: ${status.posts} | Reposts: ${status.reposts} | Education: ON | Repost Ready: ${status.repostReady ? '✅' : '⏰'}`);
+      
+      // Check MCP connection health every 15 minutes
+      if (minutes % 15 === 0) {
+        try {
+          const cmcEngine = authenticTwitter.cmcEngine;
+          if (cmcEngine && cmcEngine.coinGeckoEngine && cmcEngine.coinGeckoEngine.coinGeckoMCP) {
+            const isHealthy = await cmcEngine.coinGeckoEngine.coinGeckoMCP.checkConnectionHealth();
+            console.log(`🔗 [MCP HEALTH] CoinGecko MCP connection: ${isHealthy ? '✅ HEALTHY' : '❌ UNHEALTHY'}`);
+            
+            if (!isHealthy && cmcEngine.coinGeckoEngine.coinGeckoInitialized) {
+              console.log('🔄 [MCP HEALTH] Attempting to reconnect CoinGecko MCP...');
+              cmcEngine.coinGeckoEngine.coinGeckoInitialized = false;
+              await cmcEngine.coinGeckoEngine.initializeMCP();
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ [MCP HEALTH] Health check failed:', error.message);
+        }
+      }
       
       if (minutes % 30 === 0) {
         console.log(`\n🔥 AUTHENTIC STATUS UPDATE: ${minutes} minutes`);
@@ -1561,6 +1640,7 @@ async function main() {
         console.log(`   💎 Educational triggers: Market conditions + scheduled intervals`);
         console.log(`   🚨 Scam protection: Pattern detection + community warnings`);
         console.log(`   📈 Trading education: Real market examples + psychology insights`);
+        console.log(`   🔗 MCP Health: CoinGecko connection monitored every 15 minutes`);
       }
     }, 60000);
     

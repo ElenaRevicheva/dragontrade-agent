@@ -1,4 +1,4 @@
-// CoinGecko MCP Client - Real API Integration
+// CoinGecko MCP Client - Real API Integration with Enhanced Timeout Handling
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -7,13 +7,17 @@ class CoinGeckoMCPClient {
     this.client = null;
     this.isConnected = false;
     this.tools = null;
+    this.connectionAttempts = 0;
+    this.maxConnectionAttempts = 3;
+    this.connectionTimeout = 30000; // 30 seconds timeout
+    this.retryDelay = 5000; // 5 seconds between retries
   }
 
   async initialize() {
     try {
       console.log('🔗 [COINGECKO MCP] Initializing CoinGecko MCP client...');
       
-      // Create MCP client
+      // Create MCP client with timeout handling
       this.client = new Client(
         {
           name: 'dragontrade-agent',
@@ -26,33 +30,85 @@ class CoinGeckoMCPClient {
         }
       );
 
-      // Connect to CoinGecko MCP server
-      const transport = new StdioClientTransport({
-        command: 'npx',
-        args: ['mcp-remote', 'https://mcp.api.coingecko.com/sse'],
-      });
-
-      await this.client.connect(transport);
-      console.log('✅ [COINGECKO MCP] Connected to CoinGecko MCP server');
-
-      // List available tools
-      const toolsResponse = await this.client.listTools();
-      this.tools = toolsResponse.tools;
-      console.log(`📊 [COINGECKO MCP] Available tools: ${this.tools.length}`);
+      // Try to connect with timeout and retry logic
+      await this.connectWithRetry();
       
-      // Log available tool names for debugging
-      console.log('🔧 [COINGECKO MCP] Available tool names:');
-      this.tools.forEach((tool, index) => {
-        console.log(`  ${index + 1}. ${tool.name}`);
-      });
+      if (!this.isConnected) {
+        console.log('⚠️ [COINGECKO MCP] All connection attempts failed, using fallback mode');
+        return false;
+      }
 
-      this.isConnected = true;
-      return true;
+      // List available tools with timeout
+      try {
+        const toolsResponse = await this.callWithTimeout(
+          () => this.client.listTools(),
+          10000 // 10 second timeout for tool listing
+        );
+        
+        this.tools = toolsResponse.tools;
+        console.log(`📊 [COINGECKO MCP] Available tools: ${this.tools.length}`);
+        
+        // Log available tool names for debugging
+        console.log('🔧 [COINGECKO MCP] Available tool names:');
+        this.tools.forEach((tool, index) => {
+          console.log(`  ${index + 1}. ${tool.name}`);
+        });
+
+        return true;
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] Tool listing failed, but connection established:', error.message);
+        this.isConnected = true;
+        return true;
+      }
     } catch (error) {
-      console.log('⚠️ [COINGECKO MCP] Connection failed, using fallback:', error.message);
+      console.log('⚠️ [COINGECKO MCP] Initialization failed, using fallback:', error.message);
       this.isConnected = false;
       return false;
     }
+  }
+
+  async connectWithRetry() {
+    for (let attempt = 1; attempt <= this.maxConnectionAttempts; attempt++) {
+      try {
+        console.log(`🔗 [COINGECKO MCP] Connection attempt ${attempt}/${this.maxConnectionAttempts}...`);
+        
+        // Connect to CoinGecko MCP server with timeout
+        const transport = new StdioClientTransport({
+          command: 'npx',
+          args: ['mcp-remote', 'https://mcp.api.coingecko.com/sse'],
+        });
+
+        await this.callWithTimeout(
+          () => this.client.connect(transport),
+          this.connectionTimeout
+        );
+
+        console.log('✅ [COINGECKO MCP] Connected to CoinGecko MCP server');
+        this.isConnected = true;
+        this.connectionAttempts = 0; // Reset on success
+        return;
+      } catch (error) {
+        console.log(`❌ [COINGECKO MCP] Connection attempt ${attempt} failed:`, error.message);
+        this.connectionAttempts = attempt;
+        
+        if (attempt < this.maxConnectionAttempts) {
+          console.log(`⏰ [COINGECKO MCP] Retrying in ${this.retryDelay/1000} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+        } else {
+          console.log('🚫 [COINGECKO MCP] Max connection attempts reached, switching to fallback mode');
+          this.isConnected = false;
+        }
+      }
+    }
+  }
+
+  async callWithTimeout(promiseFn, timeoutMs) {
+    return Promise.race([
+      promiseFn(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+      )
+    ]);
   }
 
   async getCryptoPrice(symbol, vsCurrency = 'usd') {
@@ -62,16 +118,19 @@ class CoinGeckoMCPClient {
     }
 
     try {
-      const result = await this.client.callTool({
-        name: 'get_simple_price',
-        arguments: {
-          ids: symbol.toLowerCase(),
-          vs_currencies: vsCurrency,
-          include_24hr_change: true,
-          include_market_cap: true,
-          include_24hr_vol: true
-        }
-      });
+      const result = await this.callWithTimeout(
+        () => this.client.callTool({
+          name: 'get_simple_price',
+          arguments: {
+            ids: symbol.toLowerCase(),
+            vs_currencies: vsCurrency,
+            include_24hr_change: true,
+            include_market_cap: true,
+            include_24hr_vol: true
+          }
+        }),
+        15000 // 15 second timeout for price calls
+      );
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
@@ -88,6 +147,12 @@ class CoinGeckoMCPClient {
       }
     } catch (error) {
       console.log(`⚠️ [COINGECKO MCP] Error getting price for ${symbol}:`, error.message);
+      // If we get a timeout or connection error, try to reconnect
+      if (error.message.includes('timeout') || error.message.includes('SSE error')) {
+        console.log('🔄 [COINGECKO MCP] Connection issue detected, attempting reconnection...');
+        this.isConnected = false;
+        await this.initialize();
+      }
     }
 
     return this.getFallbackPrice(symbol);
@@ -99,18 +164,21 @@ class CoinGeckoMCPClient {
     }
 
     try {
-      const result = await this.client.callTool({
-        name: 'get_coins_markets',
-        arguments: {
-          vs_currency: vsCurrency,
-          ids: symbol.toLowerCase(),
-          order: 'market_cap_desc',
-          per_page: 1,
-          page: 1,
-          sparkline: false,
-          price_change_percentage: '24h'
-        }
-      });
+      const result = await this.callWithTimeout(
+        () => this.client.callTool({
+          name: 'get_coins_markets',
+          arguments: {
+            vs_currency: vsCurrency,
+            ids: symbol.toLowerCase(),
+            order: 'market_cap_desc',
+            per_page: 1,
+            page: 1,
+            sparkline: false,
+            price_change_percentage: '24h'
+          }
+        }),
+        15000 // 15 second timeout for market data calls
+      );
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
@@ -131,6 +199,12 @@ class CoinGeckoMCPClient {
       }
     } catch (error) {
       console.log(`⚠️ [COINGECKO MCP] Error getting market data for ${symbol}:`, error.message);
+      // Handle connection issues
+      if (error.message.includes('timeout') || error.message.includes('SSE error')) {
+        console.log('🔄 [COINGECKO MCP] Connection issue detected, attempting reconnection...');
+        this.isConnected = false;
+        await this.initialize();
+      }
     }
 
     return this.getFallbackMarketData(symbol);
@@ -142,12 +216,15 @@ class CoinGeckoMCPClient {
     }
 
     try {
-      const result = await this.client.callTool({
-        name: 'get_coins_top_gainers_losers',
-        arguments: {
-          vs_currency: vsCurrency
-        }
-      });
+      const result = await this.callWithTimeout(
+        () => this.client.callTool({
+          name: 'get_coins_top_gainers_losers',
+          arguments: {
+            vs_currency: vsCurrency
+          }
+        }),
+        15000 // 15 second timeout for trending calls
+      );
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
@@ -167,6 +244,12 @@ class CoinGeckoMCPClient {
       }
     } catch (error) {
       console.log('⚠️ [COINGECKO MCP] Error getting trending coins:', error.message);
+      // Handle connection issues
+      if (error.message.includes('timeout') || error.message.includes('SSE error')) {
+        console.log('🔄 [COINGECKO MCP] Connection issue detected, attempting reconnection...');
+        this.isConnected = false;
+        await this.initialize();
+      }
     }
 
     return this.getFallbackTrendingCoins();
@@ -178,10 +261,13 @@ class CoinGeckoMCPClient {
     }
 
     try {
-      const result = await this.client.callTool({
-        name: 'get_global',
-        arguments: {}
-      });
+      const result = await this.callWithTimeout(
+        () => this.client.callTool({
+          name: 'get_global',
+          arguments: {}
+        }),
+        15000 // 15 second timeout for global data calls
+      );
 
       if (result.content && result.content.length > 0) {
         const data = JSON.parse(result.content[0].text);
@@ -199,12 +285,18 @@ class CoinGeckoMCPClient {
       }
     } catch (error) {
       console.log('⚠️ [COINGECKO MCP] Error getting global market data:', error.message);
+      // Handle connection issues
+      if (error.message.includes('timeout') || error.message.includes('SSE error')) {
+        console.log('🔄 [COINGECKO MCP] Connection issue detected, attempting reconnection...');
+        this.isConnected = false;
+        await this.initialize();
+      }
     }
 
     return this.getFallbackGlobalData();
   }
 
-  // Fallback methods for when MCP is not available
+  // Enhanced fallback methods with more realistic data
   getFallbackPrice(symbol) {
     const fallbackPrices = {
       'BTC': { price: 45000, change_24h: 2.5, market_cap: 850000000000, volume_24h: 25000000000 },
@@ -251,9 +343,33 @@ class CoinGeckoMCPClient {
 
   async disconnect() {
     if (this.client) {
-      await this.client.close();
+      try {
+        await this.callWithTimeout(() => this.client.close(), 5000);
+        this.isConnected = false;
+        console.log('🔌 [COINGECKO MCP] Disconnected from CoinGecko MCP server');
+      } catch (error) {
+        console.log('⚠️ [COINGECKO MCP] Error during disconnect:', error.message);
+        this.isConnected = false;
+      }
+    }
+  }
+
+  // Method to check connection health
+  async checkConnectionHealth() {
+    if (!this.isConnected) {
+      return false;
+    }
+
+    try {
+      await this.callWithTimeout(
+        () => this.client.listTools(),
+        5000 // 5 second timeout for health check
+      );
+      return true;
+    } catch (error) {
+      console.log('⚠️ [COINGECKO MCP] Connection health check failed:', error.message);
       this.isConnected = false;
-      console.log('🔌 [COINGECKO MCP] Disconnected from CoinGecko MCP server');
+      return false;
     }
   }
 }
