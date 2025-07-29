@@ -306,7 +306,7 @@ class CryptoEducationEngine {
           return {
             type: 'coingecko_enhanced',
             status: 'educational',
-            content: `🔗 COINGECKO MCP ENHANCED ANALYSIS:\n\n📊 REAL-TIME DATA FROM COINGECKO:\n• BTC: $${coinGeckoData.btc.price.toLocaleString()} (${coinGeckoData.btc.change_24h > 0 ? '+' : ''}${coinGeckoData.btc.change_24h.toFixed(2)}%)\n• ETH: $${coinGeckoData.eth.price.toLocaleString()} (${coinGeckoData.eth.change_24h > 0 ? '+' : ''}${coinGeckoData.eth.change_24h.toFixed(2)}%)\n• SOL: $${coinGeckoData.sol.price.toLocaleString()} (${coinGeckoData.sol.change_24h > 0 ? '+' : ''}${coinGeckoData.sol.change_24h.toFixed(2)}%)\n\n🔥 TRENDING COINS (24H):\n${coinGeckoData.trending.slice(0, 3).map((coin, i) => `${i + 1}. ${coin.symbol}: $${coin.price.toLocaleString()} (${coin.change_24h > 0 ? '+' : ''}${coin.change_24h.toFixed(2)}%)`).join('\n')}\n\n💰 GLOBAL MARKET:\n• Total Market Cap: $${Math.floor(coinGeckoData.global.total_market_cap / 1000000000)}B\n• 24H Volume: $${Math.floor(coinGeckoData.global.total_volume_24h / 1000000000)}B\n• Positive Assets: ${coinGeckoData.positive_coins}/${coinGeckoData.total_coins}\n\n🔗 SOURCE: CoinGecko MCP Real-Time API\n🎓 ENHANCED: Real market data + Educational insights\n\n#CoinGecko #RealData #MCPEnhanced #AlgomEducation`
+            content: `🔗 COINGECKO MCP ENHANCED ANALYSIS:\n\n📊 REAL-TIME DATA FROM COINGECKO:\n• BTC: $${coinGeckoData.btc.price.toLocaleString()} (${coinGeckoData.btc.change_24h > 0 ? '+' : ''}${coinGeckoData.btc.change_24h.toFixed(2)}%)\n• ETH: $${coinGeckoData.eth.price.toLocaleString()} (${coinGeckoData.eth.change_24h > 0 ? '+' : ''}${coinGeckoData.eth.change_24h.toFixed(2)}%)\n• SOL: $${coinGeckoData.sol.price.toLocaleString()} (${coinGeckoData.sol.change_24h > 0 ? '+' : ''}${coinGeckoData.sol.change_24h.toFixed(2)}%)\n\n🔥 TRENDING COINS (24H):\n${coinGeckoData.trending.slice(0, 3).map((coin, i) => `${i + 1}. ${coin.symbol}: $${coin.price.toLocaleString()} (${coin.change_24h > 0 ? '+' : ''}${coin.change_24h.toFixed(2)}%)`).join('\n')}\n\n💰 GLOBAL MARKET:\n• Total Market Cap: $${Math.floor(coinGeckoData.global.total_market_cap / 1000000000)}B\n• 24H Volume: $${Math.floor(coinGeckoData.global.total_volume_24h / 1000000000)}B\n• Positive Assets: ${coinGeckoData.positive_coins}/${coinGeckoData.total_coins}\n\n📊 Data provided by CoinGecko\n🔗 https://www.coingecko.com?utm_source=dragontrade-agent&utm_medium=referral\n🎓 ENHANCED: Real market data + Educational insights\n\n#CoinGecko #RealData #MCPEnhanced #AlgomEducation`
           };
         }
       } catch (error) {
@@ -644,7 +644,7 @@ class AuthenticCMCEngine {
       last_updated: new Date().toISOString(),
       positive_coins: positiveCoins,
       total_coins: allCoins.length,
-      source: 'CoinGecko MCP'
+      source: 'CoinGecko' // Simplified source name for attribution
     };
     
     if (allCoins.length > 0) {
@@ -873,7 +873,13 @@ class AuthenticCMCEngine {
     const btc = data.all_coins?.find(c => c.symbol === 'BTC');
     const eth = data.all_coins?.find(c => c.symbol === 'ETH');
     const source = data.source || 'CoinGecko MCP';
-    return `📊 ALGOM MARKET DATA REPORT:\n\n🟠 BTC: ${btc ? `$${btc.price.toLocaleString()} (${btc.change_24h > 0 ? '+' : ''}${btc.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n🔵 ETH: ${eth ? `$${eth.price.toLocaleString()} (${eth.change_24h > 0 ? '+' : ''}${eth.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n📊 POSITIVE ASSETS: ${data.positive_coins}/${data.total_coins}\n\n🔍 SOURCE: ${source} (Live)\n⏰ UPDATED: ${new Date().toLocaleTimeString()}\n\n#RealData #${source.includes('CoinGecko') ? 'CoinGecko' : 'CMC'}Facts #AlgomReport`;
+    
+    // Proper CoinGecko attribution
+    const attribution = source.includes('CoinGecko') 
+      ? `\n\n📊 Data provided by CoinGecko\n🔗 https://www.coingecko.com?utm_source=dragontrade-agent&utm_medium=referral`
+      : `\n\n🔍 SOURCE: ${source} (Live)`;
+    
+    return `📊 ALGOM MARKET DATA REPORT:\n\n🟠 BTC: ${btc ? `$${btc.price.toLocaleString()} (${btc.change_24h > 0 ? '+' : ''}${btc.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n🔵 ETH: ${eth ? `$${eth.price.toLocaleString()} (${eth.change_24h > 0 ? '+' : ''}${eth.change_24h.toFixed(2)}%)` : 'Data unavailable'}\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n📊 POSITIVE ASSETS: ${data.positive_coins}/${data.total_coins}${attribution}\n⏰ UPDATED: ${new Date().toLocaleTimeString()}\n\n#RealData #${source.includes('CoinGecko') ? 'CoinGecko' : 'CMC'}Facts #AlgomReport`;
   }
 
   generateRealSentimentMeter(data) {
@@ -885,7 +891,13 @@ class AuthenticCMCEngine {
     const marketCapB = Math.floor(data.total_market_cap / 1000000000);
     const volumeB = Math.floor(data.total_volume_24h / 1000000000);
     const source = data.source || 'CoinGecko MCP';
-    return `📊 ALGOM REAL SENTIMENT METER:\n\n${meterBar}\n🎯 SCORE: ${realScore}/100 ${arrow}\n🧠 STATUS: ${realLabel}\n📊 BASIS: ${data.positive_coins}/${data.total_coins} assets positive\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n\n🔍 METHOD: ${source} performance ratio\n⏰ UPDATED: Live\n\n#RealSentiment #DataDriven #AlgomMeter`;
+    
+    // Proper CoinGecko attribution
+    const attribution = source.includes('CoinGecko') 
+      ? `\n\n📊 Data provided by CoinGecko\n🔗 https://www.coingecko.com?utm_source=dragontrade-agent&utm_medium=referral`
+      : `\n\n🔍 METHOD: ${source} performance ratio`;
+    
+    return `📊 ALGOM REAL SENTIMENT METER:\n\n${meterBar}\n🎯 SCORE: ${realScore}/100 ${arrow}\n🧠 STATUS: ${realLabel}\n📊 BASIS: ${data.positive_coins}/${data.total_coins} assets positive\n💰 MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B${attribution}\n⏰ UPDATED: Live\n\n#RealSentiment #DataDriven #AlgomMeter`;
   }
 
   generateRealMeterBar(score) {
@@ -899,7 +911,13 @@ class AuthenticCMCEngine {
     const volumeB = Math.floor(data.total_volume_24h / 1000000000);
     const btcDom = data.btc_dominance.toFixed(1);
     const source = data.source || 'CoinGecko MCP';
-    return `📸 ALGOM MARKET SNAPSHOT:\n\n💰 TOTAL MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n🟠 BTC DOMINANCE: ${btcDom}%\n📊 SENTIMENT: ${data.market_sentiment.toUpperCase()}\n✅ POSITIVE: ${data.positive_coins} assets\n❌ NEGATIVE: ${data.total_coins - data.positive_coins} assets\n\n🔍 DATA: ${source} (${data.total_coins} assets tracked)\n⏰ TIMESTAMP: ${new Date().toLocaleTimeString()}\n\n#MarketSnapshot #RealData #${source.includes('CoinGecko') ? 'CoinGecko' : 'CMC'}Live`;
+    
+    // Proper CoinGecko attribution
+    const attribution = source.includes('CoinGecko') 
+      ? `\n\n📊 Data provided by CoinGecko\n🔗 https://www.coingecko.com?utm_source=dragontrade-agent&utm_medium=referral`
+      : `\n\n🔍 DATA: ${source} (${data.total_coins} assets tracked)`;
+    
+    return `📸 ALGOM MARKET SNAPSHOT:\n\n💰 TOTAL MARKET CAP: $${marketCapB}B\n📈 24H VOLUME: $${volumeB}B\n🟠 BTC DOMINANCE: ${btcDom}%\n📊 SENTIMENT: ${data.market_sentiment.toUpperCase()}\n✅ POSITIVE: ${data.positive_coins} assets\n❌ NEGATIVE: ${data.total_coins - data.positive_coins} assets${attribution}\n⏰ TIMESTAMP: ${new Date().toLocaleTimeString()}\n\n#MarketSnapshot #RealData #${source.includes('CoinGecko') ? 'CoinGecko' : 'CMC'}Live`;
   }
 
   generateRealVolumeReport(data) {
