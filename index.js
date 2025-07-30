@@ -11,6 +11,7 @@ import { CoinGeckoDirectAPI } from './coingecko-direct-api.js';
 import { AZTokenIntegration } from './az-token-integration.js';
 import { MCPScamDetection } from './mcp-scam-detection.js';
 import { MCPTradingSimulator } from './mcp-trading-simulator.js';
+import { MCPHealthMonitor } from './mcp-health-monitor.js';
 
 dotenv.config();
 
@@ -41,6 +42,9 @@ class CryptoEducationEngine {
     this.scamDetection = new MCPScamDetection();
     this.tradingSimulator = new MCPTradingSimulator();
     
+    // MCP Health Monitoring
+    this.mcpHealthMonitor = new MCPHealthMonitor();
+    
     this.mcpInitialized = false;
     this.coinGeckoInitialized = false;
     this.coinGeckoDirectInitialized = false;
@@ -56,6 +60,10 @@ class CryptoEducationEngine {
   async initializeMCP() {
     if (!this.mcpInitialized) {
       try {
+        // Set longer timeout for MCP connections
+        const mcpTimeout = parseInt(process.env.MCP_TIMEOUT) || 60000; // 60 seconds default
+        console.log(`⏰ [MCP] Using timeout: ${mcpTimeout}ms`);
+        
         await this.educationalMCP.initialize();
         this.mcpInitialized = true;
         console.log('🎓 Educational MCP integrated with CryptoEducationEngine');
@@ -84,12 +92,33 @@ class CryptoEducationEngine {
     if (!this.coinGeckoDirectInitialized && !this.coinGeckoInitialized) {
       try {
         console.log('🔗 [COINGECKO MCP] Attempting to initialize MCP client as fallback...');
-        const success = await this.coinGeckoMCP.initialize();
-        if (success) {
-        this.coinGeckoInitialized = true;
-          console.log('✅ CoinGecko MCP integrated with CryptoEducationEngine (fallback)');
-        } else {
-          console.log('⚠️ CoinGecko MCP fallback mode activated - connection failed');
+        
+        // Add retry logic for MCP initialization
+        let retryCount = 0;
+        const maxRetries = parseInt(process.env.MCP_RETRY_ATTEMPTS) || 3;
+        const retryDelay = parseInt(process.env.MCP_RECONNECT_DELAY) || 10000;
+        
+        while (retryCount < maxRetries) {
+          try {
+            const success = await this.coinGeckoMCP.initialize();
+            if (success) {
+              this.coinGeckoInitialized = true;
+              console.log('✅ CoinGecko MCP integrated with CryptoEducationEngine (fallback)');
+              break;
+            } else {
+              throw new Error('MCP initialization returned false');
+            }
+          } catch (error) {
+            retryCount++;
+            console.log(`⚠️ [COINGECKO MCP] Attempt ${retryCount}/${maxRetries} failed:`, error.message);
+            
+            if (retryCount < maxRetries) {
+              console.log(`⏰ [COINGECKO MCP] Retrying in ${retryDelay/1000} seconds...`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            } else {
+              console.log('⚠️ CoinGecko MCP fallback mode activated - all retries failed');
+            }
+          }
         }
       } catch (error) {
         console.log('⚠️ CoinGecko MCP fallback mode activated:', error.message);
@@ -125,6 +154,14 @@ class CryptoEducationEngine {
       } catch (error) {
         console.log('⚠️ Trading simulator fallback mode activated:', error.message);
       }
+    }
+
+    // Start MCP health monitoring
+    try {
+      await this.mcpHealthMonitor.startMonitoring();
+      console.log('🏥 MCP health monitoring activated');
+    } catch (error) {
+      console.log('⚠️ MCP health monitoring failed to start:', error.message);
     }
   }
 
@@ -1178,6 +1215,12 @@ class AuthenticTwitterClient {
   constructor() {
     console.log('🐉 Initializing 100% AUTHENTIC Algom with Advanced Education...');
     
+    // Force resume mechanism for stuck rate limiting states
+    if (process.env.FORCE_RESUME_RATE_LIMITS === 'true' || process.env.RESET_PAUSE_STATE === 'true') {
+      console.log('🔄 [FORCE RESUME] Detected stuck rate limiting state, forcing resume...');
+      console.log('🔄 [FORCE RESUME] Resetting pause state and consecutive failures...');
+    }
+    
     const apiKey = process.env.TWITTER_API_KEY;
     const apiSecret = process.env.TWITTER_API_SECRET;
     const accessToken = process.env.TWITTER_ACCESS_TOKEN;
@@ -1213,6 +1256,14 @@ class AuthenticTwitterClient {
       isPaused: false,
       pauseUntil: 0
     };
+    
+    // Force resume if environment variable is set
+    if (process.env.FORCE_RESUME_RATE_LIMITS === 'true' || process.env.RESET_PAUSE_STATE === 'true') {
+      this.rateLimitTracker.isPaused = false;
+      this.rateLimitTracker.pauseUntil = 0;
+      this.rateLimitTracker.consecutiveFailures = 0;
+      console.log('✅ [FORCE RESUME] Rate limiting state reset successfully');
+    }
     
     console.log('🔥 100% Authentic CMC Engine loaded');
     console.log('🎯 Quality Control + Education features activated');
@@ -1253,14 +1304,24 @@ class AuthenticTwitterClient {
     const schedulePost = () => {
       // Check if we should pause posting due to rate limits
       if (this.rateLimitTracker.isPaused) {
-        const remainingMinutes = Math.ceil((this.rateLimitTracker.pauseUntil - Date.now()) / 60000);
-        console.log(`🚫 [RATE LIMIT] Skipping post scheduling - bot paused for ${remainingMinutes} minutes`);
+        const now = Date.now();
+        const remainingMinutes = Math.ceil((this.rateLimitTracker.pauseUntil - now) / 60000);
         
-        // Schedule next check in 30 minutes
-        this.postInterval = setTimeout(() => {
-          schedulePost();
-        }, 30 * 60 * 1000);
-        return;
+        // If pause period has expired, resume immediately
+        if (now >= this.rateLimitTracker.pauseUntil) {
+          console.log('🔄 [RATE LIMIT] Pause period expired, resuming normal operation');
+          this.rateLimitTracker.isPaused = false;
+          this.rateLimitTracker.consecutiveFailures = 0;
+          this.rateLimitTracker.pauseUntil = 0;
+        } else {
+          console.log(`🚫 [RATE LIMIT] Skipping post scheduling - bot paused for ${remainingMinutes} minutes`);
+          
+          // Schedule next check in 30 minutes
+          this.postInterval = setTimeout(() => {
+            schedulePost();
+          }, 30 * 60 * 1000);
+          return;
+        }
       }
       
       const randomInterval = Math.random() * (maxInterval - minInterval) + minInterval;
@@ -1848,18 +1909,33 @@ async function main() {
       
       console.log(`[${new Date().toISOString()}] 🐉 AUTHENTIC ALGOM: ${minutes}min | Status: ${status.main} | Posts: ${status.posts} | Reposts: ${status.reposts} | Education: ON | Repost Ready: ${status.repostReady ? '✅' : '⏰'}`);
       
-      // Check MCP connection health every 15 minutes
+      // Enhanced MCP connection health check every 15 minutes
       if (minutes % 15 === 0) {
         try {
           const cmcEngine = authenticTwitter.cmcEngine;
-          if (cmcEngine && cmcEngine.coinGeckoEngine && cmcEngine.coinGeckoEngine.coinGeckoMCP) {
-            const isHealthy = await cmcEngine.coinGeckoEngine.coinGeckoMCP.checkConnectionHealth();
-            console.log(`🔗 [MCP HEALTH] CoinGecko MCP connection: ${isHealthy ? '✅ HEALTHY' : '❌ UNHEALTHY'}`);
-            
-            if (!isHealthy && cmcEngine.coinGeckoEngine.coinGeckoInitialized) {
-              console.log('🔄 [MCP HEALTH] Attempting to reconnect CoinGecko MCP...');
-              cmcEngine.coinGeckoEngine.coinGeckoInitialized = false;
-              await cmcEngine.coinGeckoEngine.initializeMCP();
+          if (cmcEngine && cmcEngine.coinGeckoEngine) {
+            // Check if we have a health monitor
+            if (cmcEngine.coinGeckoEngine.mcpHealthMonitor) {
+              const summary = cmcEngine.coinGeckoEngine.mcpHealthMonitor.getHealthSummary();
+              console.log(`🏥 [MCP HEALTH] Recent health: ${summary.recentHealthPercentage.toFixed(1)}% | Total checks: ${summary.totalChecks}`);
+              
+              if (summary.recentHealthPercentage < 50) {
+                console.log('⚠️ [MCP HEALTH] Poor connection health detected, attempting reconnection...');
+                cmcEngine.coinGeckoEngine.coinGeckoInitialized = false;
+                await cmcEngine.coinGeckoEngine.initializeMCP();
+              }
+            } else {
+              // Fallback to direct health check
+              if (cmcEngine.coinGeckoEngine.coinGeckoMCP) {
+                const isHealthy = await cmcEngine.coinGeckoEngine.coinGeckoMCP.checkConnectionHealth();
+                console.log(`🔗 [MCP HEALTH] CoinGecko MCP connection: ${isHealthy ? '✅ HEALTHY' : '❌ UNHEALTHY'}`);
+                
+                if (!isHealthy && cmcEngine.coinGeckoEngine.coinGeckoInitialized) {
+                  console.log('🔄 [MCP HEALTH] Attempting to reconnect CoinGecko MCP...');
+                  cmcEngine.coinGeckoEngine.coinGeckoInitialized = false;
+                  await cmcEngine.coinGeckoEngine.initializeMCP();
+                }
+              }
             }
           }
         } catch (error) {

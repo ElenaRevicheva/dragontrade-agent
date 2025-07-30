@@ -18,7 +18,15 @@
         "mcp-remote",
         "https://mcp.api.coingecko.com/sse"
       ],
-      "env": {}
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=4096",
+        "MCP_TIMEOUT": "45000",
+        "MCP_RETRY_ATTEMPTS": "5",
+        "MCP_RETRY_DELAY": "10000"
+      }
     }
-  }
+  },
+  "timeout": 45000,
+  "retryAttempts": 5,
+  "retryDelay": 10000
 }
