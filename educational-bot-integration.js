@@ -12,23 +12,63 @@ const __dirname = path.dirname(__filename);
 class TradingStatsReporter {
   constructor() {
     this.statsPath = path.join(__dirname, 'trading_stats.json');
-    this.lastReportedTrade = 0;
+    this.bybitStatsPath = path.join(__dirname, 'bybit_trading_stats.json');
+    this.binanceStatsPath = path.join(__dirname, 'binance_trading_stats.json');
+    this.lastReportedTrade = {
+      bybit: 0,
+      binance: 0,
+      generic: 0
+    };
     this.reportHistory = [];
   }
 
-  // READ REAL TRADING STATS
-  async readTradingStats() {
+  // READ REAL TRADING STATS FROM SPECIFIC EXCHANGE
+  async readTradingStats(exchange = null) {
     try {
-      const data = await fs.readFile(this.statsPath, 'utf-8');
+      let statsPath;
+      
+      if (exchange === 'bybit') {
+        statsPath = this.bybitStatsPath;
+      } else if (exchange === 'binance') {
+        statsPath = this.binanceStatsPath;
+      } else {
+        // Try generic first, then bybit, then binance
+        statsPath = this.statsPath;
+      }
+      
+      const data = await fs.readFile(statsPath, 'utf-8');
       return JSON.parse(data);
     } catch (error) {
-      console.log('⚠️ No trading stats available yet');
+      console.log(`⚠️ No trading stats available yet for ${exchange || 'generic'}`);
       return null;
     }
   }
 
+  // READ STATS FROM ALL EXCHANGES
+  async readAllTradingStats() {
+    const stats = {};
+    
+    // Try Bybit
+    try {
+      const bybitData = await fs.readFile(this.bybitStatsPath, 'utf-8');
+      stats.bybit = JSON.parse(bybitData);
+    } catch (error) {
+      stats.bybit = null;
+    }
+    
+    // Try Binance
+    try {
+      const binanceData = await fs.readFile(this.binanceStatsPath, 'utf-8');
+      stats.binance = JSON.parse(binanceData);
+    } catch (error) {
+      stats.binance = null;
+    }
+    
+    return stats;
+  }
+
   // GENERATE HONEST TRADE REPORT
-  generateTradeReport(stats) {
+  generateTradeReport(stats, exchange = 'paper') {
     if (!stats || !stats.recentTrades || stats.recentTrades.length === 0) {
       return null;
     }
@@ -36,16 +76,19 @@ class TradingStatsReporter {
     // Get the most recent trade
     const latestTrade = stats.recentTrades[stats.recentTrades.length - 1];
     
-    // Don't report the same trade twice
-    if (latestTrade.id <= this.lastReportedTrade) {
+    // Don't report the same trade twice (per exchange)
+    const lastReported = this.lastReportedTrade[exchange] || 0;
+    if (latestTrade.id <= lastReported) {
       return null;
     }
     
-    this.lastReportedTrade = latestTrade.id;
+    this.lastReportedTrade[exchange] = latestTrade.id;
 
     const isWin = latestTrade.pnl > 0;
     const emoji = isWin ? '🟢' : '🔴';
     const outcome = isWin ? 'WIN' : 'LOSS';
+    const exchangeEmoji = exchange === 'bybit' ? '🟣' : exchange === 'binance' ? '🟡' : '🤖';
+    const exchangeName = exchange.toUpperCase();
     
     // HONEST ANALYSIS - NO SUGAR COATING
     let analysis = '';
@@ -56,7 +99,7 @@ class TradingStatsReporter {
       analysis = this.generateLossAnalysis(latestTrade, stats);
     }
 
-    const post = `${emoji} ALGOM PAPER TRADING BOT - ${outcome}\n\n` +
+    const post = `${emoji} ALGOM PAPER TRADING - ${outcome}\n${exchangeEmoji} Exchange: ${exchangeName}\n\n` +
                  `📊 REAL TRADE RESULTS:\n` +
                  `• Entry: $${latestTrade.entryPrice.toLocaleString()}\n` +
                  `• Exit: $${latestTrade.exitPrice.toLocaleString()}\n` +
@@ -311,9 +354,72 @@ class TradingStatsReporter {
     return post;
   }
 
+  // GENERATE COMPARISON POST (BOTH EXCHANGES)
+  async generateComparisonPost() {
+    const allStats = await this.readAllTradingStats();
+    
+    if (!allStats.bybit && !allStats.binance) {
+      return null;
+    }
+    
+    const bybit = allStats.bybit;
+    const binance = allStats.binance;
+    
+    let post = `📊 ALGOM DUAL EXCHANGE PAPER TRADING\n\n`;
+    post += `🎯 REAL-TIME COMPARISON:\n\n`;
+    
+    if (bybit) {
+      post += `🟣 BYBIT:\n`;
+      post += `• Trades: ${bybit.totalTrades} (${bybit.wins}W/${bybit.losses}L)\n`;
+      post += `• Win Rate: ${bybit.winRate.toFixed(1)}%\n`;
+      post += `• P&L: ${bybit.totalPnL >= 0 ? '🟢' : '🔴'} $${bybit.totalPnL.toFixed(2)} (${bybit.totalPnLPercent.toFixed(2)}%)\n`;
+      post += `• Profit Factor: ${bybit.profitFactor.toFixed(2)}\n\n`;
+    }
+    
+    if (binance) {
+      post += `🟡 BINANCE:\n`;
+      post += `• Trades: ${binance.totalTrades} (${binance.wins}W/${binance.losses}L)\n`;
+      post += `• Win Rate: ${binance.winRate.toFixed(1)}%\n`;
+      post += `• P&L: ${binance.totalPnL >= 0 ? '🟢' : '🔴'} $${binance.totalPnL.toFixed(2)} (${binance.totalPnLPercent.toFixed(2)}%)\n`;
+      post += `• Profit Factor: ${binance.profitFactor.toFixed(2)}\n\n`;
+    }
+    
+    if (bybit && binance) {
+      const better = bybit.totalPnLPercent > binance.totalPnLPercent ? 'Bybit' : 'Binance';
+      post += `🏆 LEADER: ${better} is ${Math.abs(bybit.totalPnLPercent - binance.totalPnLPercent).toFixed(2)}% ahead\n\n`;
+    }
+    
+    post += `💡 LESSON: Testing same strategy on multiple exchanges reveals which has better execution.\n\n`;
+    post += `#PaperTrading #MultiExchange #AlgomBot #RealData`;
+    
+    return post;
+  }
+
   // MAIN METHOD: Check stats and generate appropriate post
   async generatePost(postType = 'auto') {
-    const stats = await this.readTradingStats();
+    const allStats = await this.readAllTradingStats();
+    
+    // If we have both exchanges, sometimes post comparison
+    if (allStats.bybit && allStats.binance && Math.random() < 0.3) {
+      const comparisonPost = await this.generateComparisonPost();
+      if (comparisonPost) return comparisonPost;
+    }
+    
+    // Otherwise, pick one exchange to report on
+    let stats = null;
+    let exchange = null;
+    
+    if (allStats.bybit && allStats.binance) {
+      // If both exist, alternate between them
+      exchange = Math.random() < 0.5 ? 'bybit' : 'binance';
+      stats = allStats[exchange];
+    } else if (allStats.bybit) {
+      exchange = 'bybit';
+      stats = allStats.bybit;
+    } else if (allStats.binance) {
+      exchange = 'binance';
+      stats = allStats.binance;
+    }
     
     if (!stats) {
       return null;
@@ -321,26 +427,36 @@ class TradingStatsReporter {
 
     switch (postType) {
       case 'trade':
-        return this.generateTradeReport(stats);
+        return this.generateTradeReport(stats, exchange);
       case 'daily':
-        return this.generateDailyReport(stats);
+        return this.generateDailyReport(stats, exchange);
       case 'weekly':
-        return this.generateWeeklyReport(stats);
+        return this.generateWeeklyReport(stats, exchange);
       case 'strategy':
         return this.generateStrategyInsight(stats);
       case 'hodl':
         return this.generateHODLComparison(stats);
+      case 'comparison':
+        return this.generateComparisonPost();
       case 'auto':
-        // Automatic selection based on what's new
-        const tradePost = this.generateTradeReport(stats);
-        if (tradePost) return tradePost;
+        // Check for new trades on either exchange
+        const bybitTrade = allStats.bybit ? this.generateTradeReport(allStats.bybit, 'bybit') : null;
+        const binanceTrade = allStats.binance ? this.generateTradeReport(allStats.binance, 'binance') : null;
+        
+        if (bybitTrade) return bybitTrade;
+        if (binanceTrade) return binanceTrade;
         
         // Otherwise return a random educational post
         const random = Math.random();
-        if (random < 0.5) return this.generateStrategyInsight(stats);
-        return this.generateDailyReport(stats);
+        if (random < 0.3 && allStats.bybit && allStats.binance) {
+          return this.generateComparisonPost();
+        } else if (random < 0.6) {
+          return this.generateStrategyInsight(stats);
+        } else {
+          return this.generateDailyReport(stats, exchange);
+        }
       default:
-        return this.generateDailyReport(stats);
+        return this.generateDailyReport(stats, exchange);
     }
   }
 }

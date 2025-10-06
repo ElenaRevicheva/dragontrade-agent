@@ -622,6 +622,7 @@ class ProductionPaperTradingBot {
   // EXPORT STATS FOR EDUCATIONAL BOT
   async exportStats() {
     const statsData = {
+      exchange: this.config.exchange, // Add exchange name to stats
       timestamp: new Date().toISOString(),
       balance: this.balance,
       totalPnL: this.stats.totalPnL,
@@ -640,9 +641,14 @@ class ProductionPaperTradingBot {
     };
     
     try {
-      // Save to file for educational bot to read
-      const statsPath = path.join(__dirname, 'trading_stats.json');
+      // Save to exchange-specific file for educational bot to read
+      const exchangeName = this.config.exchange.toLowerCase();
+      const statsPath = path.join(__dirname, `${exchangeName}_trading_stats.json`);
       await fs.writeFile(statsPath, JSON.stringify(statsData, null, 2));
+      
+      // Also save to generic file (backwards compatibility)
+      const genericStatsPath = path.join(__dirname, 'trading_stats.json');
+      await fs.writeFile(genericStatsPath, JSON.stringify(statsData, null, 2));
     } catch (error) {
       console.error('⚠️  Failed to export stats:', error.message);
     }
