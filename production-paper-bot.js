@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 // CONFIGURATION - SET YOUR REAL API KEYS (READ-ONLY for paper trading)
 const CONFIG = {
-  exchange: process.env.EXCHANGE || 'bybit', // bybit works from Singapore! (change Railway region to Singapore)
+  exchange: process.env.EXCHANGE || 'kraken', // Kraken for paper trading (Binance/Bybit block cloud IPs - use locally for real money)
   symbol: 'BTC/USDT',
   timeframe: '5m',
   initialBalance: 10000, // Paper money starting capital
