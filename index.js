@@ -12,6 +12,7 @@ import { AZTokenIntegration } from './az-token-integration.js';
 import { MCPScamDetection } from './mcp-scam-detection.js';
 import { MCPTradingSimulator } from './mcp-trading-simulator.js';
 import { MCPHealthMonitor } from './mcp-health-monitor.js';
+import TradingStatsReporter from './educational-bot-integration.js';
 
 dotenv.config();
 
@@ -44,6 +45,9 @@ class CryptoEducationEngine {
     
     // MCP Health Monitoring
     this.mcpHealthMonitor = new MCPHealthMonitor();
+    
+    // PAPER TRADING BOT INTEGRATION
+    this.tradingStatsReporter = new TradingStatsReporter();
     
     this.mcpInitialized = false;
     this.coinGeckoInitialized = false;
@@ -903,7 +907,10 @@ class AuthenticCMCEngine {
   }
 
   selectRealInsightType(marketData) {
-    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson'];
+    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson', 'paper_trading_report'];
+    
+    // PAPER TRADING BOT REPORTS - Real trading results!
+    if (this.postCounter % 8 === 0) return 'paper_trading_report';
     
     // NEW HACKATHON FEATURES - Higher priority for demo
     if (this.postCounter % 15 === 0) return 'advanced_scam_detection';
@@ -970,6 +977,8 @@ class AuthenticCMCEngine {
         return await this.generateTradingSimulation(insight.data);
       case 'personalized_lesson':
         return await this.generatePersonalizedLesson(insight.data);
+      case 'paper_trading_report':
+        return await this.generatePaperTradingReport(insight.data);
       default:
         return this.generateRealDataReport(insight.data);
     }
@@ -1130,6 +1139,42 @@ class AuthenticCMCEngine {
       console.log('⚠️ Personalized lesson failed, using fallback:', error.message);
       return this.generateEducationalPost(data);
     }
+  }
+
+  async generatePaperTradingReport(data) {
+    try {
+      console.log('📊 [PAPER TRADING] Generating real trading stats report...');
+      
+      // Try to get post from paper trading bot stats
+      const tradingPost = await this.tradingStatsReporter.generatePost('auto');
+      
+      if (tradingPost) {
+        console.log('✅ [PAPER TRADING] Real trading stats available!');
+        return tradingPost;
+      }
+      
+      // If no stats yet, return educational content about paper trading
+      console.log('⏳ [PAPER TRADING] No stats yet, posting about strategy...');
+      return this.generatePaperTradingExplanation();
+    } catch (error) {
+      console.log('⚠️ Paper trading report failed, using fallback:', error.message);
+      return this.generateEducationalPost(data);
+    }
+  }
+
+  generatePaperTradingExplanation() {
+    return `🤖 ALGOM PAPER TRADING BOT - COMING SOON!\n\n` +
+           `🎯 We're launching a REAL paper trading bot that:\n` +
+           `• Uses live Bybit market data\n` +
+           `• Executes MA crossover + RSI strategy\n` +
+           `• Tracks every trade (wins AND losses)\n` +
+           `• Posts HONEST results daily\n\n` +
+           `💡 WHY PAPER TRADING?\n` +
+           `Testing strategies with fake money before risking real capital. ` +
+           `If our bot is profitable for 6 months, we'll consider real money.\n\n` +
+           `🎓 This is how professional traders learn. ` +
+           `We'll share every trade, every lesson, every mistake.\n\n` +
+           `#PaperTrading #TransparentTrading #AlgomBot #NoLies`;
   }
 
   generateRealDataReport(data) {
