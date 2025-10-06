@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 // CONFIGURATION - SET YOUR REAL API KEYS (READ-ONLY for paper trading)
 const CONFIG = {
-  exchange: process.env.EXCHANGE || 'kraken', // kraken, okx, coinbase, or bybit (binance blocked on Railway)
+  exchange: process.env.EXCHANGE || 'bybit', // bybit recommended (binance often geo-blocked on cloud servers)
   symbol: 'BTC/USDT',
   timeframe: '5m',
   initialBalance: 10000, // Paper money starting capital
@@ -212,8 +212,71 @@ class ProductionPaperTradingBot {
 
   // REAL-TIME PRICE FEED (WebSocket)
   async startRealTimeDataFeed() {
-    console.log('📡 Starting real-time WebSocket feed...');
+    console.log('📡 Starting real-time price polling (REST API)...');
+    console.log('💡 WebSocket will be added in future update\n');
     
+    // For now, use polling instead of WebSocket (works with all exchanges)
+    this.startPolling();
+  }
+
+  // POLLING-BASED PRICE FEED (Works with ALL exchanges)
+  startPolling() {
+    const pollInterval = 5 * 60 * 1000; // 5 minutes (same as timeframe)
+    
+    console.log(`✅ Polling started - checking for new candles every ${this.config.timeframe}`);
+    console.log(`⏰ Next check in 5 minutes...\n`);
+    
+    this.isRunning = true;
+    
+    // Poll immediately
+    this.pollNewCandle();
+    
+    // Then poll every 5 minutes
+    setInterval(() => {
+      if (this.isRunning) {
+        this.pollNewCandle();
+      }
+    }, pollInterval);
+  }
+
+  async pollNewCandle() {
+    try {
+      const ohlcv = await this.exchange.fetchOHLCV(
+        this.config.symbol,
+        this.config.timeframe,
+        undefined,
+        2 // Get last 2 candles
+      );
+      
+      if (ohlcv && ohlcv.length >= 2) {
+        const latestCandle = ohlcv[ohlcv.length - 2]; // Use second-to-last (closed candle)
+        
+        const candle = {
+          timestamp: latestCandle[0],
+          open: latestCandle[1],
+          high: latestCandle[2],
+          low: latestCandle[3],
+          close: latestCandle[4],
+          volume: latestCandle[5]
+        };
+        
+        // Check if this is a new candle
+        if (this.candles.length === 0 || candle.timestamp > this.candles[this.candles.length - 1].timestamp) {
+          this.onNewCandle(candle);
+        } else {
+          console.log(`⏳ Waiting for new candle... Current: ${new Date().toLocaleTimeString()}`);
+        }
+        
+        // Update current price from latest (unclosed) candle
+        this.currentPrice = ohlcv[ohlcv.length - 1][4];
+      }
+    } catch (error) {
+      console.error('⚠️ Error polling candle:', error.message);
+    }
+  }
+
+  // LEGACY WEBSOCKET CODE (Binance only - keeping for reference)
+  async startBinanceWebSocket() {
     if (this.config.exchange === 'binance') {
       const symbol = this.config.symbol.replace('/', '').toLowerCase();
       const wsUrl = `wss://stream.binance.com:9443/ws/${symbol}@kline_${this.config.timeframe}`;
