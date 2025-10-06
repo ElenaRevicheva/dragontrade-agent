@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 // CONFIGURATION - SET YOUR REAL API KEYS (READ-ONLY for paper trading)
 const CONFIG = {
-  exchange: 'binance', // or 'bybit'
+  exchange: process.env.EXCHANGE || 'kraken', // kraken, okx, coinbase, or bybit (binance blocked on Railway)
   symbol: 'BTC/USDT',
   timeframe: '5m',
   initialBalance: 10000, // Paper money starting capital
@@ -42,15 +42,33 @@ const CONFIG = {
   },
   
   // REAL API KEYS (READ-ONLY for paper trading - NOT REQUIRED for public data)
-  binance: {
-    apiKey: process.env.BINANCE_API_KEY || '',
-    secret: process.env.BINANCE_SECRET || '',
+  kraken: {
+    apiKey: process.env.KRAKEN_API_KEY || '',
+    secret: process.env.KRAKEN_SECRET || '',
+    options: { defaultType: 'spot' }
+  },
+  
+  okx: {
+    apiKey: process.env.OKX_API_KEY || '',
+    secret: process.env.OKX_SECRET || '',
+    options: { defaultType: 'spot' }
+  },
+  
+  coinbase: {
+    apiKey: process.env.COINBASE_API_KEY || '',
+    secret: process.env.COINBASE_SECRET || '',
     options: { defaultType: 'spot' }
   },
   
   bybit: {
     apiKey: process.env.BYBIT_API_KEY || '',
     secret: process.env.BYBIT_SECRET || '',
+    options: { defaultType: 'spot' }
+  },
+  
+  binance: {
+    apiKey: process.env.BINANCE_API_KEY || '',
+    secret: process.env.BINANCE_SECRET || '',
     options: { defaultType: 'spot' }
   }
 };
@@ -116,10 +134,18 @@ class ProductionPaperTradingBot {
     
     try {
       // Connect to real exchange
-      if (this.config.exchange === 'binance') {
-        this.exchange = new ccxt.binance(this.config.binance);
-      } else if (this.config.exchange === 'bybit') {
-        this.exchange = new ccxt.bybit(this.config.bybit);
+      const exchangeName = this.config.exchange;
+      const exchangeConfig = this.config[exchangeName];
+      
+      if (!exchangeConfig) {
+        throw new Error(`Exchange ${exchangeName} not configured`);
+      }
+      
+      // Create exchange instance dynamically
+      if (ccxt[exchangeName]) {
+        this.exchange = new ccxt[exchangeName](exchangeConfig);
+      } else {
+        throw new Error(`Exchange ${exchangeName} not supported by ccxt`);
       }
       
       // Test connection
