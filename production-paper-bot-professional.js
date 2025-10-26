@@ -411,51 +411,116 @@ class ProfessionalPaperTradingBot {
       }
       
       let entrySignal = null;
+      let side = null;
       let confirmations = [];
       
-      // BULLISH ENTRY CONDITIONS
+      const hasVolumeConfirmation = currentVolume > avgVolume * this.config.strategy.volumeMultiplier;
+      
+      // Previous candles for crossover detection
+      const prevFastMA = this.calculateMA(
+        this.candles.slice(0, -1).map(c => c.close),
+        this.config.strategy.fastMA
+      );
+      const prevSlowMA = this.calculateMA(
+        this.candles.slice(0, -1).map(c => c.close),
+        this.config.strategy.slowMA
+      );
+      
+      // ═══════════════════════════════════════════════════════════
+      // BULLISH ENTRY CONDITIONS (LONG)
+      // ═══════════════════════════════════════════════════════════
+      let bullishScore = 0;
+      const bullishConfirmations = [];
+      
       if (fastMA > slowMA && this.currentPrice > trendMA) {
-        confirmations.push('✓ Price above trend MA (bullish structure)');
+        bullishConfirmations.push('✓ Price above trend MA (bullish structure)');
+        bullishScore++;
         
         if (rsi > this.config.strategy.rsiNeutralLow && rsi < this.config.strategy.rsiOverbought) {
-          confirmations.push('✓ RSI in healthy range (not overbought)');
-          
-          if (currentVolume > avgVolume * this.config.strategy.volumeMultiplier) {
-            confirmations.push('✓ Volume confirmation (strong interest)');
-            
-            // Check for recent crossover
-            const prevFastMA = this.calculateMA(
-              this.candles.slice(0, -1).map(c => c.close),
-              this.config.strategy.fastMA
-            );
-            const prevSlowMA = this.calculateMA(
-              this.candles.slice(0, -1).map(c => c.close),
-              this.config.strategy.slowMA
-            );
-            
-            if (prevFastMA <= prevSlowMA) {
-              confirmations.push('✓ Fresh MA crossover (new momentum)');
-              entrySignal = 'GOLDEN_CROSS';
-            } else if (trend === 'STRONG UPTREND') {
-              confirmations.push('✓ Strong uptrend continuation');
-              entrySignal = 'TREND_CONTINUATION';
+          bullishConfirmations.push('✓ RSI in healthy range (not overbought)');
+          bullishScore++;
+        }
+        
+        if (hasVolumeConfirmation) {
+          bullishConfirmations.push('✓ Volume confirmation (strong interest)');
+          bullishScore++;
+        }
+        
+        // Check for crossover or strong trend
+        if (prevFastMA <= prevSlowMA) {
+          bullishConfirmations.push('✓ Fresh MA crossover (new momentum)');
+          entrySignal = 'GOLDEN_CROSS';
+          side = 'LONG';
+          confirmations = [...bullishConfirmations];
+        } else if (trend === 'STRONG UPTREND') {
+          bullishConfirmations.push('✓ Strong uptrend continuation');
+          if (hasVolumeConfirmation || bullishScore >= 2) {
+            entrySignal = hasVolumeConfirmation ? 'TREND_CONTINUATION' : 'TREND_CONTINUATION_STRONG';
+            side = 'LONG';
+            confirmations = [...bullishConfirmations];
+            if (!hasVolumeConfirmation) {
+              confirmations.push('⚡ Volume not required (strong signals)');
             }
           }
         }
       }
       
-      // EXECUTE ENTRY if all confirmations met
-      if (entrySignal && confirmations.length >= 3) {
-        console.log(`\n🎯 ENTRY SIGNAL: ${entrySignal}`);
+      // ═══════════════════════════════════════════════════════════
+      // BEARISH ENTRY CONDITIONS (SHORT)
+      // ═══════════════════════════════════════════════════════════
+      if (!entrySignal) {
+        let bearishScore = 0;
+        const bearishConfirmations = [];
+        
+        if (fastMA < slowMA && this.currentPrice < trendMA) {
+          bearishConfirmations.push('✓ Price below trend MA (bearish structure)');
+          bearishScore++;
+          
+          if (rsi < this.config.strategy.rsiNeutralHigh && rsi > this.config.strategy.rsiOversold) {
+            bearishConfirmations.push('✓ RSI in healthy range (not oversold)');
+            bearishScore++;
+          }
+          
+          if (hasVolumeConfirmation) {
+            bearishConfirmations.push('✓ Volume confirmation (strong interest)');
+            bearishScore++;
+          }
+          
+          // Check for crossover or strong downtrend
+          if (prevFastMA >= prevSlowMA) {
+            bearishConfirmations.push('✓ Fresh MA crossover (new momentum)');
+            entrySignal = 'DEATH_CROSS';
+            side = 'SHORT';
+            confirmations = [...bearishConfirmations];
+          } else if (trend === 'STRONG DOWNTREND') {
+            bearishConfirmations.push('✓ Strong downtrend continuation');
+            if (hasVolumeConfirmation || bearishScore >= 2) {
+              entrySignal = hasVolumeConfirmation ? 'DOWNTREND_CONTINUATION' : 'DOWNTREND_CONTINUATION_STRONG';
+              side = 'SHORT';
+              confirmations = [...bearishConfirmations];
+              if (!hasVolumeConfirmation) {
+                confirmations.push('⚡ Volume not required (strong signals)');
+              }
+            }
+          }
+        }
+      }
+      
+      // EXECUTE ENTRY if signal found and minimum confirmations met
+      if (entrySignal && side && confirmations.length >= 3) {
+        console.log(`\n🎯 ${side} ENTRY SIGNAL: ${entrySignal}`);
         console.log(`\n📋 CONFIRMATIONS:`);
         confirmations.forEach(c => console.log(`   ${c}`));
         
-        this.openPosition('LONG', entrySignal, confirmations);
+        this.openPosition(side, entrySignal, confirmations);
       } else {
         console.log(`\n⏳ No entry signal`);
-        if (confirmations.length > 0) {
-          console.log(`   Partial confirmations (${confirmations.length}/3+):`);
-          confirmations.forEach(c => console.log(`   ${c}`));
+        if (confirmations.length > 0 || bullishScore > 0) {
+          const allPartials = [...(bullishScore > 0 ? bullishConfirmations : [])];
+          if (allPartials.length > 0) {
+            console.log(`   Partial confirmations (${allPartials.length}/3+):`);
+            allPartials.forEach(c => console.log(`   ${c}`));
+          }
         }
       }
     }
