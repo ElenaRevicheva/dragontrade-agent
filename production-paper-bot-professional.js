@@ -918,6 +918,18 @@ class ProfessionalPaperTradingBot {
       expectancy: this.stats.expectancy,
       maxDrawdown: this.stats.maxDrawdown,
       currentStreak: this.stats.currentStreak,
+      
+      // Enhanced stats
+      longTrades: this.stats.longTrades || 0,
+      shortTrades: this.stats.shortTrades || 0,
+      longWins: this.stats.longWins || 0,
+      shortWins: this.stats.shortWins || 0,
+      totalFees: this.stats.totalFees || 0,
+      avgHoldTime: this.stats.avgHoldTime || 0,
+      largestWin: this.stats.largestWin || 0,
+      largestLoss: this.stats.largestLoss || 0,
+      signalPerformance: this.stats.signalPerformance || {},
+      
       recentTrades: this.trades.slice(-10),
       currentPosition: this.position,
       riskControl: this.riskControl,
