@@ -20,6 +20,13 @@ const CONFIG = {
   timeframe: '15m', // 15-minute candles for daily activity
   initialBalance: 10000,
   
+  // PAPER TRADING COSTS (make it realistic!)
+  paperTradingCosts: {
+    fee: 0.001,          // 0.1% exchange fee per trade
+    slippage: 0.0003,    // 0.03% average slippage
+    stopLossSlippage: 0.002  // 0.2% stop loss slippage
+  },
+  
   // PROFESSIONAL STRATEGY PARAMETERS
   strategy: {
     // Moving Averages for trend
@@ -34,8 +41,8 @@ const CONFIG = {
     rsiNeutralHigh: 55,
     rsiNeutralLow: 45,
     
-    // Volume confirmation
-    volumeMultiplier: 1.5, // Must be 1.5x average volume
+    // Volume confirmation (relaxed from 1.5 to 1.2 for more opportunities)
+    volumeMultiplier: 1.2, // Must be 1.2x average volume
     
     // Position sizing (CONSERVATIVE)
     positionSizePercent: 20, // Only 20% per trade
@@ -458,24 +465,32 @@ class ProfessionalPaperTradingBot {
     const positionSize = this.balance * (this.config.strategy.positionSizePercent / 100);
     const amount = positionSize / this.currentPrice;
     
-    const stopLoss = this.currentPrice * (1 - this.config.strategy.stopLossPercent / 100);
-    const takeProfit = this.currentPrice * (1 + this.config.strategy.takeProfitPercent / 100);
+    // Apply realistic slippage (price worse than expected)
+    const slippagePercent = this.config.paperTradingCosts.slippage;
+    const actualEntryPrice = this.currentPrice * (1 + slippagePercent);
+    
+    // Calculate fees
+    const entryFee = positionSize * this.config.paperTradingCosts.fee;
+    
+    const stopLoss = actualEntryPrice * (1 - this.config.strategy.stopLossPercent / 100);
+    const takeProfit = actualEntryPrice * (1 + this.config.strategy.takeProfitPercent / 100);
     
     this.position = {
       side,
-      entryPrice: this.currentPrice,
+      entryPrice: actualEntryPrice,  // Use slipped price
       amount,
       invested: positionSize,
+      entryFee: entryFee,  // Track fees
       stopLoss,
       takeProfit,
       trailingStop: null,
       openTime: Date.now(),
       entrySignal: signal,
       confirmations: confirmations,
-      highestPrice: this.currentPrice
+      highestPrice: actualEntryPrice
     };
     
-    this.balance -= positionSize;
+    this.balance -= (positionSize + entryFee);  // Deduct fees
     this.lastTradeTime = Date.now();
     this.stats.dailyTrades++;
     
@@ -547,9 +562,23 @@ class ProfessionalPaperTradingBot {
   closePosition(reason) {
     if (!this.position) return;
     
-    const exitPrice = this.currentPrice;
+    // Apply realistic slippage and fees
+    let exitPrice = this.currentPrice;
+    
+    // Stop losses get worse slippage
+    if (reason === 'STOP_LOSS') {
+      exitPrice = exitPrice * (1 - this.config.paperTradingCosts.stopLossSlippage);
+    } else {
+      exitPrice = exitPrice * (1 - this.config.paperTradingCosts.slippage);
+    }
+    
     const exitValue = this.position.amount * exitPrice;
-    const pnl = exitValue - this.position.invested;
+    const exitFee = exitValue * this.config.paperTradingCosts.fee;
+    const netExitValue = exitValue - exitFee;
+    
+    // Calculate P&L including all costs
+    const totalFees = this.position.entryFee + exitFee;
+    const pnl = netExitValue - this.position.invested;
     const pnlPercent = (pnl / this.position.invested) * 100;
     const holdTime = Date.now() - this.position.openTime;
     
