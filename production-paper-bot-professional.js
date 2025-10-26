@@ -337,6 +337,24 @@ class ProfessionalPaperTradingBot {
     if (volumes.length >= 20) {
       this.indicators.avgVolume = this.calculateMA(volumes, 20);
     }
+    
+    // Volatility (ATR - Average True Range)
+    if (this.candles.length >= 14) {
+      this.indicators.volatility = this.calculateVolatility(14);
+    }
+  }
+  
+  calculateVolatility(period = 14) {
+    const recentCandles = this.candles.slice(-period);
+    const trueRanges = recentCandles.map(candle => {
+      return candle.high - candle.low;
+    });
+    
+    const atr = trueRanges.reduce((a, b) => a + b, 0) / period;
+    const avgPrice = recentCandles.reduce((a, c) => a + c.close, 0) / period;
+    
+    // Return volatility as percentage
+    return (atr / avgPrice) * 100;
   }
 
   calculateMA(data, period) {
@@ -527,7 +545,24 @@ class ProfessionalPaperTradingBot {
   }
 
   openPosition(side, signal, confirmations) {
-    const positionSize = this.balance * (this.config.strategy.positionSizePercent / 100);
+    // Calculate position size with volatility adjustment
+    let positionSizePercent = this.config.strategy.positionSizePercent;
+    
+    // Adjust position size based on volatility
+    if (this.indicators.volatility) {
+      if (this.indicators.volatility > 3) {
+        // High volatility (>3%) - reduce position size by 25%
+        positionSizePercent *= 0.75;
+        console.log(`   ⚠️  High volatility (${this.indicators.volatility.toFixed(2)}%) - Position reduced to ${positionSizePercent}%`);
+      } else if (this.indicators.volatility < 1.5) {
+        // Low volatility (<1.5%) - can increase position size by 10%
+        positionSizePercent *= 1.1;
+        positionSizePercent = Math.min(positionSizePercent, 25); // Cap at 25%
+        console.log(`   ✅ Low volatility (${this.indicators.volatility.toFixed(2)}%) - Position increased to ${positionSizePercent.toFixed(1)}%`);
+      }
+    }
+    
+    const positionSize = this.balance * (positionSizePercent / 100);
     const amount = positionSize / this.currentPrice;
     
     // Apply realistic slippage (price worse than expected)
