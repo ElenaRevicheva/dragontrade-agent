@@ -6,7 +6,7 @@ class MCPHealthMonitor {
     this.client = new CoinGeckoMCPClient();
     this.healthChecks = [];
     this.isMonitoring = false;
-    this.checkInterval = 60000; // Check every minute
+    this.checkInterval = 300000; // Check every 5 minutes (reduced from 1 min to avoid Railway limits)
   }
 
   async startMonitoring() {
@@ -31,16 +31,9 @@ class MCPHealthMonitor {
     try {
       // Check if client is initialized
       if (!this.client.isConnected) {
-        console.log('⚠️ MCP client not connected, attempting initialization...');
-        const success = await this.client.initialize();
-        
-        if (success) {
-          console.log('✅ MCP client reconnected successfully');
-        } else {
-          console.log('❌ MCP client reconnection failed');
-          this.recordHealthCheck('FAILED_INIT', 'Client initialization failed');
-          return;
-        }
+        console.log('⚠️ MCP client not connected, skipping reconnection (will use fallback)');
+        this.recordHealthCheck('DISCONNECTED', 'Client not connected - using fallback mode');
+        return; // Don't attempt reconnection - avoids Railway process limits
       }
 
       // Test connection health
