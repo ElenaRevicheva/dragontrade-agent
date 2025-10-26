@@ -767,6 +767,7 @@ class ProfessionalPaperTradingBot {
       amount: this.position.amount,
       pnl,
       pnlPercent,
+      fees: totalFees,
       holdTime,
       reason,
       entrySignal: this.position.entrySignal,
@@ -780,12 +781,13 @@ class ProfessionalPaperTradingBot {
     this.updateStats(trade);
     
     console.log(`\n${'═'.repeat(70)}`);
-    console.log(`${pnl >= 0 ? '🟢 PROFIT' : '🔴 LOSS'} - POSITION CLOSED (${reason})`);
+    console.log(`${pnl >= 0 ? '🟢 PROFIT' : '🔴 LOSS'} - ${this.position.side} POSITION CLOSED (${reason})`);
     console.log(`${'═'.repeat(70)}`);
     console.log(`   Entry Signal: ${this.position.entrySignal}`);
-    console.log(`   Entry: $${this.position.entryPrice.toLocaleString()}`);
-    console.log(`   Exit: $${exitPrice.toLocaleString()}`);
-    console.log(`   P&L: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnl >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`);
+    console.log(`   Entry: $${this.position.entryPrice.toLocaleString()} (with slippage)`);
+    console.log(`   Exit: $${exitPrice.toLocaleString()} (with slippage)`);
+    console.log(`   Fees: $${totalFees.toFixed(2)} (${(totalFees/this.position.invested*100).toFixed(2)}%)`);
+    console.log(`   Net P&L: ${pnl >= 0 ? '🟢 +' : '🔴 '}$${pnl.toFixed(2)} (${pnl >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`);
     console.log(`   Hold Time: ${this.formatTime(holdTime)}`);
     console.log(`   Balance: $${this.balance.toLocaleString()}`);
     console.log(`${'═'.repeat(70)}`);
@@ -839,9 +841,18 @@ class ProfessionalPaperTradingBot {
     
     console.log(`\n📊 PERFORMANCE STATS:`);
     console.log(`   Total Trades: ${this.stats.totalTrades} (${this.stats.wins}W/${this.stats.losses}L)`);
+    if (this.stats.longTrades || this.stats.shortTrades) {
+      console.log(`     LONG: ${this.stats.longTrades || 0} (${this.stats.longWins || 0}W) | SHORT: ${this.stats.shortTrades || 0} (${this.stats.shortWins || 0}W)`);
+    }
     console.log(`   Win Rate: ${this.stats.winRate.toFixed(1)}%`);
+    if (this.stats.avgWinPercent && this.stats.avgLossPercent) {
+      console.log(`     Avg Win: +${this.stats.avgWinPercent.toFixed(2)}% | Avg Loss: ${this.stats.avgLossPercent.toFixed(2)}%`);
+    }
     console.log(`   Profit Factor: ${this.stats.profitFactor.toFixed(2)}`);
     console.log(`   Total P&L: ${this.stats.totalPnL >= 0 ? '+' : ''}$${this.stats.totalPnL.toFixed(2)} (${this.stats.totalPnL >= 0 ? '+' : ''}${this.stats.totalPnLPercent.toFixed(2)}%)`);
+    if (this.stats.totalFees) {
+      console.log(`   Total Fees: $${this.stats.totalFees.toFixed(2)}`);
+    }
     console.log(`   Expectancy: ${this.stats.expectancy.toFixed(2)}% per trade`);
     console.log(`   Max Drawdown: ${this.stats.maxDrawdown.toFixed(2)}%`);
   }
