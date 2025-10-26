@@ -160,10 +160,13 @@ class CryptoEducationEngine {
       }
     }
 
-    // DISABLED: MCP health monitoring (causes Railway process limits)
-    // Paper trading posts don't need MCP - they use local JSON files
-    // Regular posts will fallback gracefully if MCP fails
-    console.log('ℹ️ MCP health monitoring disabled - paper trading uses local files');
+    // Start MCP health monitoring
+    try {
+      await this.mcpHealthMonitor.startMonitoring();
+      console.log('🏥 MCP health monitoring activated');
+    } catch (error) {
+      console.log('⚠️ MCP health monitoring failed to start:', error.message);
+    }
   }
 
   analyzeScamRisk(tweet, marketData) {

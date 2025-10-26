@@ -63,14 +63,11 @@ class CoinGeckoMCPClient {
       } catch (error) {
         console.log('⚠️ [COINGECKO MCP] Tool listing failed, but connection established:', error.message);
         this.isConnected = true;
-           } catch (error) {
+        this.lastHealthCheck = Date.now();
+        return true;
+      }
+    } catch (error) {
       console.log('⚠️ [COINGECKO MCP] Initialization failed, using fallback:', error.message);
-      this.isConnected = false;
-      
-      // Mark as failed to prevent constant reconnection attempts
-      this.connectionAttempts = this.maxConnectionAttempts;
-      return false;
-    }r.message);
       this.isConnected = false;
       return false;
     }
@@ -96,20 +93,18 @@ class CoinGeckoMCPClient {
         );
 
         console.log('✅ [COINGECKO MCP] Connected to CoinGecko MCP server');
-        thi      } catch (error) {
+        this.isConnected = true;
+        this.connectionAttempts = 0; // Reset on success
+        return;
+      } catch (error) {
         console.log(`❌ [COINGECKO MCP] Connection attempt ${attempt} failed:`, error.message);
         this.connectionAttempts = attempt;
         
         if (attempt < this.maxConnectionAttempts) {
-          // Calculate backoff delay here (in scope)
-          const currentBackoffDelay = this.retryDelay * Math.pow(this.connectionRetryBackoff, attempt - 1);
-          console.log(`⏰ [COINGECKO MCP] Retrying in ${currentBackoffDelay/1000} seconds (exponential backoff)...`);
-          await new Promise(resolve => setTimeout(resolve, currentBackoffDelay));
+          console.log(`⏰ [COINGECKO MCP] Retrying in ${backoffDelay/1000} seconds (exponential backoff)...`);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
         } else {
           console.log('🚫 [COINGECKO MCP] Max connection attempts reached, switching to fallback mode');
-          this.isConnected = false;
-        }
-      }tion attempts reached, switching to fallback mode');
           this.isConnected = false;
         }
       }
