@@ -467,13 +467,22 @@ class ProfessionalPaperTradingBot {
     
     // Apply realistic slippage (price worse than expected)
     const slippagePercent = this.config.paperTradingCosts.slippage;
-    const actualEntryPrice = this.currentPrice * (1 + slippagePercent);
+    let actualEntryPrice, stopLoss, takeProfit;
+    
+    if (side === 'LONG') {
+      // LONG: Buy higher (slippage against us)
+      actualEntryPrice = this.currentPrice * (1 + slippagePercent);
+      stopLoss = actualEntryPrice * (1 - this.config.strategy.stopLossPercent / 100);
+      takeProfit = actualEntryPrice * (1 + this.config.strategy.takeProfitPercent / 100);
+    } else {
+      // SHORT: Sell lower (slippage against us)
+      actualEntryPrice = this.currentPrice * (1 - slippagePercent);
+      stopLoss = actualEntryPrice * (1 + this.config.strategy.stopLossPercent / 100);  // Stop higher for SHORT
+      takeProfit = actualEntryPrice * (1 - this.config.strategy.takeProfitPercent / 100);  // TP lower for SHORT
+    }
     
     // Calculate fees
     const entryFee = positionSize * this.config.paperTradingCosts.fee;
-    
-    const stopLoss = actualEntryPrice * (1 - this.config.strategy.stopLossPercent / 100);
-    const takeProfit = actualEntryPrice * (1 + this.config.strategy.takeProfitPercent / 100);
     
     this.position = {
       side,
@@ -487,7 +496,8 @@ class ProfessionalPaperTradingBot {
       openTime: Date.now(),
       entrySignal: signal,
       confirmations: confirmations,
-      highestPrice: actualEntryPrice
+      highestPrice: side === 'LONG' ? actualEntryPrice : null,
+      lowestPrice: side === 'SHORT' ? actualEntryPrice : null
     };
     
     this.balance -= (positionSize + entryFee);  // Deduct fees
@@ -510,39 +520,81 @@ class ProfessionalPaperTradingBot {
   updatePosition() {
     if (!this.position) return;
     
-    const currentValue = this.position.amount * this.currentPrice;
-    const unrealizedPnL = currentValue - this.position.invested;
-    const unrealizedPnLPercent = (unrealizedPnL / this.position.invested) * 100;
+    let currentValue, unrealizedPnL, unrealizedPnLPercent;
     
-    // Update highest price for trailing stop
-    if (this.currentPrice > this.position.highestPrice) {
-      this.position.highestPrice = this.currentPrice;
+    if (this.position.side === 'LONG') {
+      // LONG: Profit when price goes up
+      currentValue = this.position.amount * this.currentPrice;
+      unrealizedPnL = currentValue - this.position.invested;
+      unrealizedPnLPercent = (unrealizedPnL / this.position.invested) * 100;
       
-      // Activate trailing stop if in profit
-      if (unrealizedPnLPercent > this.config.strategy.trailingStopPercent) {
-        this.position.trailingStop = this.position.highestPrice * (1 - this.config.strategy.trailingStopPercent / 100);
+      // Update highest price for trailing stop
+      if (this.currentPrice > this.position.highestPrice) {
+        this.position.highestPrice = this.currentPrice;
+        
+        // Activate trailing stop if in profit
+        if (unrealizedPnLPercent > this.config.strategy.trailingStopPercent) {
+          this.position.trailingStop = this.position.highestPrice * (1 - this.config.strategy.trailingStopPercent / 100);
+        }
       }
-    }
-    
-    // Check stop loss
-    if (this.currentPrice <= this.position.stopLoss) {
-      console.log(`\n🔴 STOP LOSS HIT at $${this.currentPrice.toLocaleString()}`);
-      this.closePosition('STOP_LOSS');
-      return;
-    }
-    
-    // Check trailing stop
-    if (this.position.trailingStop && this.currentPrice <= this.position.trailingStop) {
-      console.log(`\n🟡 TRAILING STOP HIT at $${this.currentPrice.toLocaleString()}`);
-      this.closePosition('TRAILING_STOP');
-      return;
-    }
-    
-    // Check take profit
-    if (this.currentPrice >= this.position.takeProfit) {
-      console.log(`\n🟢 TAKE PROFIT HIT at $${this.currentPrice.toLocaleString()}`);
-      this.closePosition('TAKE_PROFIT');
-      return;
+      
+      // Check stop loss (price drops below SL)
+      if (this.currentPrice <= this.position.stopLoss) {
+        console.log(`\n🔴 STOP LOSS HIT at $${this.currentPrice.toLocaleString()}`);
+        this.closePosition('STOP_LOSS');
+        return;
+      }
+      
+      // Check trailing stop
+      if (this.position.trailingStop && this.currentPrice <= this.position.trailingStop) {
+        console.log(`\n🟡 TRAILING STOP HIT at $${this.currentPrice.toLocaleString()}`);
+        this.closePosition('TRAILING_STOP');
+        return;
+      }
+      
+      // Check take profit (price rises above TP)
+      if (this.currentPrice >= this.position.takeProfit) {
+        console.log(`\n🟢 TAKE PROFIT HIT at $${this.currentPrice.toLocaleString()}`);
+        this.closePosition('TAKE_PROFIT');
+        return;
+      }
+      
+    } else {
+      // SHORT: Profit when price goes down
+      currentValue = this.position.invested - (this.position.amount * (this.currentPrice - this.position.entryPrice));
+      unrealizedPnL = currentValue - this.position.invested;
+      unrealizedPnLPercent = (unrealizedPnL / this.position.invested) * 100;
+      
+      // Update lowest price for trailing stop
+      if (this.currentPrice < this.position.lowestPrice) {
+        this.position.lowestPrice = this.currentPrice;
+        
+        // Activate trailing stop if in profit
+        if (unrealizedPnLPercent > this.config.strategy.trailingStopPercent) {
+          this.position.trailingStop = this.position.lowestPrice * (1 + this.config.strategy.trailingStopPercent / 100);
+        }
+      }
+      
+      // Check stop loss (price rises above SL)
+      if (this.currentPrice >= this.position.stopLoss) {
+        console.log(`\n🔴 STOP LOSS HIT at $${this.currentPrice.toLocaleString()}`);
+        this.closePosition('STOP_LOSS');
+        return;
+      }
+      
+      // Check trailing stop
+      if (this.position.trailingStop && this.currentPrice >= this.position.trailingStop) {
+        console.log(`\n🟡 TRAILING STOP HIT at $${this.currentPrice.toLocaleString()}`);
+        this.closePosition('TRAILING_STOP');
+        return;
+      }
+      
+      // Check take profit (price drops below TP)
+      if (this.currentPrice <= this.position.takeProfit) {
+        console.log(`\n🟢 TAKE PROFIT HIT at $${this.currentPrice.toLocaleString()}`);
+        this.closePosition('TAKE_PROFIT');
+        return;
+      }
     }
     
     // Check max hold time
@@ -553,7 +605,7 @@ class ProfessionalPaperTradingBot {
       return;
     }
     
-    console.log(`   📊 Position: ${unrealizedPnLPercent >= 0 ? '🟢' : '🔴'} ${unrealizedPnLPercent.toFixed(2)}% ($${unrealizedPnL.toFixed(2)})`);
+    console.log(`   📊 ${this.position.side} Position: ${unrealizedPnLPercent >= 0 ? '🟢' : '🔴'} ${unrealizedPnLPercent.toFixed(2)}% ($${unrealizedPnL.toFixed(2)})`);
     if (this.position.trailingStop) {
       console.log(`   🔒 Trailing Stop: $${this.position.trailingStop.toLocaleString()}`);
     }
@@ -564,23 +616,47 @@ class ProfessionalPaperTradingBot {
     
     // Apply realistic slippage and fees
     let exitPrice = this.currentPrice;
+    let exitValue, pnl;
     
-    // Stop losses get worse slippage
-    if (reason === 'STOP_LOSS') {
-      exitPrice = exitPrice * (1 - this.config.paperTradingCosts.stopLossSlippage);
+    if (this.position.side === 'LONG') {
+      // LONG exit: Sell (slippage makes price worse)
+      if (reason === 'STOP_LOSS') {
+        exitPrice = exitPrice * (1 - this.config.paperTradingCosts.stopLossSlippage);
+      } else {
+        exitPrice = exitPrice * (1 - this.config.paperTradingCosts.slippage);
+      }
+      
+      exitValue = this.position.amount * exitPrice;
+      const exitFee = exitValue * this.config.paperTradingCosts.fee;
+      const netExitValue = exitValue - exitFee;
+      
+      // Calculate P&L including all costs
+      const totalFees = this.position.entryFee + exitFee;
+      pnl = netExitValue - this.position.invested;
+      
     } else {
-      exitPrice = exitPrice * (1 - this.config.paperTradingCosts.slippage);
+      // SHORT exit: Buy back (slippage makes price worse)
+      if (reason === 'STOP_LOSS') {
+        exitPrice = exitPrice * (1 + this.config.paperTradingCosts.stopLossSlippage);
+      } else {
+        exitPrice = exitPrice * (1 + this.config.paperTradingCosts.slippage);
+      }
+      
+      // For SHORT: profit when exit price < entry price
+      const exitCost = this.position.amount * exitPrice;
+      const entryCost = this.position.amount * this.position.entryPrice;
+      exitValue = entryCost - (exitCost - entryCost);  // Sold high, buy back low = profit
+      
+      const exitFee = exitCost * this.config.paperTradingCosts.fee;
+      const totalFees = this.position.entryFee + exitFee;
+      
+      // SHORT P&L: Entry value - Exit cost - Fees
+      pnl = (entryCost - exitCost) - totalFees;
     }
     
-    const exitValue = this.position.amount * exitPrice;
-    const exitFee = exitValue * this.config.paperTradingCosts.fee;
-    const netExitValue = exitValue - exitFee;
-    
-    // Calculate P&L including all costs
-    const totalFees = this.position.entryFee + exitFee;
-    const pnl = netExitValue - this.position.invested;
     const pnlPercent = (pnl / this.position.invested) * 100;
     const holdTime = Date.now() - this.position.openTime;
+    const totalFees = this.position.entryFee + (exitValue * this.config.paperTradingCosts.fee);
     
     const trade = {
       id: Date.now(),
