@@ -89,6 +89,7 @@ class TradingStatsReporter {
     const outcome = isWin ? 'WIN' : 'LOSS';
     const exchangeEmoji = exchange === 'bybit' ? '🟣' : exchange === 'binance' ? '🟡' : '🤖';
     const exchangeName = exchange.toUpperCase();
+    const strategyMode = stats.strategyMode || 'STANDARD';
     
     // HONEST ANALYSIS - NO SUGAR COATING
     let analysis = '';
@@ -99,19 +100,27 @@ class TradingStatsReporter {
       analysis = this.generateLossAnalysis(latestTrade, stats);
     }
 
-    const post = `${emoji} ALGOM PAPER TRADING - ${outcome}\n${exchangeEmoji} Exchange: ${exchangeName}\n\n` +
+    // Build confirmations text if available (professional bot)
+    let confirmationsText = '';
+    if (latestTrade.entrySignal && latestTrade.confirmations) {
+      confirmationsText = `\n🎯 ENTRY SIGNAL: ${latestTrade.entrySignal}\n` +
+                         `✓ Confirmations met:\n` +
+                         latestTrade.confirmations.slice(0, 3).map(c => `  ${c}`).join('\n') + '\n';
+    }
+
+    const post = `${emoji} ALGOM ANTI-SCAM BOT - ${outcome}\n${exchangeEmoji} Exchange: ${exchangeName}\n${confirmationsText}\n` +
                  `📊 REAL TRADE RESULTS:\n` +
                  `• Entry: $${latestTrade.entryPrice.toLocaleString()}\n` +
                  `• Exit: $${latestTrade.exitPrice.toLocaleString()}\n` +
                  `• P&L: $${latestTrade.pnl.toFixed(2)} (${latestTrade.pnlPercent.toFixed(2)}%)\n` +
-                 `• Reason: ${latestTrade.reason}\n\n` +
-                 `📈 CURRENT STATS:\n` +
-                 `• Total Trades: ${stats.totalTrades}\n` +
-                 `• Win Rate: ${stats.winRate.toFixed(1)}%\n` +
+                 `• Exit: ${latestTrade.reason}\n\n` +
+                 `📈 STATS (${stats.totalTrades} trades):\n` +
+                 `• Win Rate: ${stats.winRate.toFixed(1)}% (${stats.wins}W/${stats.losses}L)\n` +
                  `• Total P&L: $${stats.totalPnL.toFixed(2)} (${stats.totalPnLPercent.toFixed(2)}%)\n` +
-                 `• Profit Factor: ${stats.profitFactor.toFixed(2)}\n\n` +
-                 `${analysis}\n\n` +
-                 `#PaperTrading #RealResults #AlgomBot #NoLies`;
+                 `• Profit Factor: ${stats.profitFactor.toFixed(2)}\n` +
+                 (stats.expectancy ? `• Expectancy: ${stats.expectancy.toFixed(2)}% per trade\n` : '') +
+                 `\n${analysis}\n\n` +
+                 `#PaperTrading #AntiScam #HonestResults`;
 
     return post;
   }
