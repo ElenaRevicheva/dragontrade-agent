@@ -5,6 +5,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createClient } from './db-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,29 @@ class TradingStatsReporter {
 
   // READ REAL TRADING STATS FROM SPECIFIC EXCHANGE
   async readTradingStats(exchange = null) {
+    // Try database first (primary method for multi-service)
+    if (process.env.DATABASE_URL) {
+      try {
+        const client = createClient();
+        await client.connect();
+        
+        const result = await client.query(
+          'SELECT data FROM trading_stats WHERE exchange = $1',
+          [exchange]
+        );
+        
+        await client.end();
+        
+        if (result.rows.length > 0) {
+          console.log(`✅ [DB] Loaded stats for ${exchange} from database`);
+          return result.rows[0].data;
+        }
+      } catch (error) {
+        console.log(`⚠️ [DB] Database read failed for ${exchange}, trying JSON fallback...`);
+      }
+    }
+    
+    // Fallback to JSON files (for local dev or if DB not configured)
     try {
       let statsPath;
       
@@ -37,6 +61,7 @@ class TradingStatsReporter {
       }
       
       const data = await fs.readFile(statsPath, 'utf-8');
+      console.log(`✅ [JSON] Loaded stats for ${exchange} from JSON file`);
       return JSON.parse(data);
     } catch (error) {
       console.log(`⚠️ No trading stats available yet for ${exchange || 'generic'}`);
@@ -46,12 +71,40 @@ class TradingStatsReporter {
 
   // READ STATS FROM ALL EXCHANGES
   async readAllTradingStats() {
+    // Try database first (primary method for multi-service)
+    if (process.env.DATABASE_URL) {
+      try {
+        const client = createClient();
+        await client.connect();
+        
+        const result = await client.query(
+          'SELECT exchange, data FROM trading_stats'
+        );
+        
+        await client.end();
+        
+        if (result.rows.length > 0) {
+          const stats = {};
+          result.rows.forEach(row => {
+            stats[row.exchange] = row.data;
+          });
+          
+          console.log(`✅ [DB] Loaded stats for ${result.rows.length} exchange(s) from database`);
+          return stats;
+        }
+      } catch (error) {
+        console.log(`⚠️ [DB] Database read failed, trying JSON fallback...`);
+      }
+    }
+    
+    // Fallback to JSON files
     const stats = {};
     
     // Try Bybit
     try {
       const bybitData = await fs.readFile(this.bybitStatsPath, 'utf-8');
       stats.bybit = JSON.parse(bybitData);
+      console.log(`✅ [JSON] Loaded Bybit stats from JSON file`);
     } catch (error) {
       stats.bybit = null;
     }
@@ -60,6 +113,7 @@ class TradingStatsReporter {
     try {
       const binanceData = await fs.readFile(this.binanceStatsPath, 'utf-8');
       stats.binance = JSON.parse(binanceData);
+      console.log(`✅ [JSON] Loaded Binance stats from JSON file`);
     } catch (error) {
       stats.binance = null;
     }
