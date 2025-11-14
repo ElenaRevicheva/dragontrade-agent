@@ -1,0 +1,102 @@
+{
+  "exchange": "bybit",
+  "timestamp": "2025-11-14T22:00:00.000Z",
+  "balance": 9950.25,
+  "totalPnL": -49.75,
+  "totalPnLPercent": -0.5,
+  "totalTrades": 3,
+  "wins": 1,
+  "losses": 2,
+  "winRate": 33.33,
+  "profitFactor": 0.85,
+  "bestTrade": 125.50,
+  "worstTrade": -150.00,
+  "avgWinPercent": 2.5,
+  "avgLossPercent": -1.75,
+  "expectancy": -0.33,
+  "maxDrawdown": 1.5,
+  "currentStreak": -2,
+  "longTrades": 2,
+  "shortTrades": 1,
+  "longWins": 1,
+  "shortWins": 0,
+  "totalFees": 25.25,
+  "avgHoldTime": 180000,
+  "largestWin": 125.50,
+  "largestLoss": -150.00,
+  "signalPerformance": {
+    "GOLDEN_CROSS": {"trades": 1, "wins": 1},
+    "DEATH_CROSS": {"trades": 1, "wins": 0},
+    "TREND_CONTINUATION": {"trades": 1, "wins": 0}
+  },
+  "recentTrades": [
+    {
+      "id": 1731619200001,
+      "symbol": "BTC/USDT",
+      "side": "LONG",
+      "entryPrice": 94500.00,
+      "exitPrice": 94762.50,
+      "amount": 0.031746,
+      "pnl": 125.50,
+      "pnlPercent": 2.50,
+      "fees": 7.50,
+      "holdTime": 180000,
+      "reason": "TAKE_PROFIT",
+      "entrySignal": "GOLDEN_CROSS",
+      "confirmations": [
+        "✓ Price above trend MA (bullish structure)",
+        "✓ RSI in healthy range (not overbought)",
+        "✓ Volume confirmation (strong interest)"
+      ],
+      "timestamp": "2025-11-14T19:00:00.000Z"
+    },
+    {
+      "id": 1731623400001,
+      "symbol": "BTC/USDT",
+      "side": "SHORT",
+      "entryPrice": 94850.00,
+      "exitPrice": 95350.00,
+      "amount": 0.031613,
+      "pnl": -75.00,
+      "pnlPercent": -1.50,
+      "fees": 7.50,
+      "holdTime": 120000,
+      "reason": "STOP_LOSS",
+      "entrySignal": "DEATH_CROSS",
+      "confirmations": [
+        "✓ Price below trend MA (bearish structure)",
+        "✓ RSI in healthy range (not oversold)",
+        "✓ Volume confirmation (strong interest)"
+      ],
+      "timestamp": "2025-11-14T20:00:00.000Z"
+    },
+    {
+      "id": 1731626100001,
+      "symbol": "BTC/USDT",
+      "side": "LONG",
+      "entryPrice": 94887.40,
+      "exitPrice": 93887.40,
+      "amount": 0.031623,
+      "pnl": -100.25,
+      "pnlPercent": -2.00,
+      "fees": 10.25,
+      "holdTime": 90000,
+      "reason": "STOP_LOSS",
+      "entrySignal": "TREND_CONTINUATION",
+      "confirmations": [
+        "✓ Price above trend MA (bullish structure)",
+        "✓ Strong uptrend continuation"
+      ],
+      "timestamp": "2025-11-14T21:00:00.000Z"
+    }
+  ],
+  "currentPosition": null,
+  "riskControl": {
+    "tradingPaused": true,
+    "pauseReason": "2 consecutive losses",
+    "dailyLoss": -175.25,
+    "peakBalance": 10000,
+    "currentDrawdown": 0.5
+  },
+  "strategyMode": "PROFESSIONAL"
+}
