@@ -909,13 +909,39 @@ class AuthenticCMCEngine {
   selectRealInsightType(marketData) {
     const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson', 'paper_trading_report'];
     
-    // PAPER TRADING BOT REPORTS - Real trading results!
-    if (this.postCounter % 3 === 0) return 'paper_trading_report';
+    // OPTIMIZED BALANCED CONTENT STRATEGY (30% trading, 70% education)
+    // Pattern repeats every 10 posts for consistency
+    const cyclePosition = this.postCounter % 10;
     
-    // NEW HACKATHON FEATURES - Higher priority for demo
-    if (this.postCounter % 15 === 0) return 'advanced_scam_detection';
-    if (this.postCounter % 12 === 0) return 'trading_simulation';
-    if (this.postCounter % 9 === 0) return 'personalized_lesson';
+    // Post 1: Technical Analysis Education
+    if (cyclePosition === 1) return 'educational_content';
+    
+    // Post 2: Real Market Data
+    if (cyclePosition === 2) return 'real_data_report';
+    
+    // Post 3: Paper Trading - BYBIT
+    if (cyclePosition === 3) return 'paper_trading_report';
+    
+    // Post 4: Risk Management
+    if (cyclePosition === 4) return 'risk_management_tip';
+    
+    // Post 5: Market Psychology
+    if (cyclePosition === 5) return 'market_psychology_insight';
+    
+    // Post 6: Paper Trading - BINANCE
+    if (cyclePosition === 6) return 'paper_trading_report';
+    
+    // Post 7: Scam Awareness
+    if (cyclePosition === 7) return 'scam_awareness';
+    
+    // Post 8: Market Sentiment
+    if (cyclePosition === 8) return 'real_sentiment_meter';
+    
+    // Post 9: Paper Trading Comparison (Both Exchanges)
+    if (cyclePosition === 9) return 'paper_trading_report';
+    
+    // Post 10/0: Advanced Educational Content
+    if (cyclePosition === 0) return 'personalized_lesson';
     
     if (this.postCounter % 10 === 0) return 'real_transparency';
     if (this.postCounter % 7 === 0) return 'educational_content';
