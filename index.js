@@ -910,7 +910,7 @@ class AuthenticCMCEngine {
     const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson', 'paper_trading_report'];
     
     // PAPER TRADING BOT REPORTS - Real trading results!
-    if (this.postCounter % 8 === 0) return 'paper_trading_report';
+    if (this.postCounter % 3 === 0) return 'paper_trading_report';
     
     // NEW HACKATHON FEATURES - Higher priority for demo
     if (this.postCounter % 15 === 0) return 'advanced_scam_detection';
