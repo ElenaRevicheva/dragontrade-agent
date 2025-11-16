@@ -1318,6 +1318,10 @@ class AuthenticTwitterClient {
     this.repostInterval = null;
     this.postCount = 0;
     this.lastTimelineCheck = 0;
+    
+    // Add helper methods for post tracking
+    this.getPostTypeFromCyclePosition = getPostTypeFromCyclePosition;
+    this.getExchangeFromContent = getExchangeFromContent;
     this.rateLimitTracker = {
       lastPost: 0,
       postsToday: 0,
