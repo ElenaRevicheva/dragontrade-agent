@@ -13,6 +13,8 @@ import { MCPScamDetection } from './mcp-scam-detection.js';
 import { MCPTradingSimulator } from './mcp-trading-simulator.js';
 import { MCPHealthMonitor } from './mcp-health-monitor.js';
 import TradingStatsReporter from './educational-bot-integration.js';
+import postLogger from './post-logger.js';
+import { getPostTypeFromCyclePosition, getExchangeFromContent } from './post-tracking-helper.js';
 
 dotenv.config();
 
@@ -1600,6 +1602,23 @@ class AuthenticTwitterClient {
         console.log('📊 Content length:', authenticContent.length);
         console.log('🏆 Authentic posts delivered:', this.postCount);
         console.log('🎯 Reputation: Building through transparency + education...');
+        
+        // Log post to database for tracking and reporting
+        try {
+          const cyclePosition = this.postCount % 10;
+          const postType = this.getPostTypeFromCyclePosition(cyclePosition);
+          const exchange = this.getExchangeFromContent(authenticContent, cyclePosition);
+          
+          await postLogger.logPost(
+            this.postCount,
+            postType,
+            authenticContent,
+            exchange,
+            { tweetId: tweet.data.id, cyclePosition }
+          );
+        } catch (logError) {
+          console.error('⚠️ Failed to log post to database:', logError.message);
+        }
       }
       
       return tweet;
