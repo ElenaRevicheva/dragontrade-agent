@@ -909,14 +909,14 @@ class AuthenticCMCEngine {
   }
 
   selectRealInsightType(marketData) {
-    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson', 'paper_trading_report'];
+    const types = ['real_data_report', 'real_sentiment_meter', 'real_market_snapshot', 'real_volume_report', 'real_gainers_report', 'real_transparency', 'educational_content', 'market_psychology_insight', 'risk_management_tip', 'scam_awareness', 'mcp_enhanced_educational', 'az_token_educational', 'coingecko_enhanced', 'advanced_scam_detection', 'trading_simulation', 'personalized_lesson', 'paper_trading_report', 'order_placement_tutorial', 'technical_analysis_lesson', 'candlestick_lesson', 'strategy_education', 'risk_scenario'];
     
-    // OPTIMIZED BALANCED CONTENT STRATEGY (30% trading, 70% education)
+    // ENHANCED BALANCED CONTENT STRATEGY (30% trading, 70% comprehensive education)
     // Pattern repeats every 10 posts for consistency
     const cyclePosition = this.postCounter % 10;
     
-    // Post 1: Technical Analysis Education
-    if (cyclePosition === 1) return 'educational_content';
+    // Post 1: Order Placement Tutorial (NEW - Practical How-To)
+    if (cyclePosition === 1) return 'order_placement_tutorial';
     
     // Post 2: Real Market Data
     if (cyclePosition === 2) return 'real_data_report';
@@ -924,26 +924,26 @@ class AuthenticCMCEngine {
     // Post 3: Paper Trading - BYBIT
     if (cyclePosition === 3) return 'paper_trading_report';
     
-    // Post 4: Risk Management
-    if (cyclePosition === 4) return 'risk_management_tip';
+    // Post 4: Technical Analysis Lesson (NEW - Expanded TA)
+    if (cyclePosition === 4) return 'technical_analysis_lesson';
     
-    // Post 5: Market Psychology
-    if (cyclePosition === 5) return 'market_psychology_insight';
+    // Post 5: Market Psychology or Risk Scenario
+    if (cyclePosition === 5) return Math.random() < 0.5 ? 'market_psychology_insight' : 'risk_scenario';
     
     // Post 6: Paper Trading - BINANCE
     if (cyclePosition === 6) return 'paper_trading_report';
     
-    // Post 7: Scam Awareness
-    if (cyclePosition === 7) return 'scam_awareness';
+    // Post 7: Strategy Education (NEW - Diversified Strategies)
+    if (cyclePosition === 7) return 'strategy_education';
     
-    // Post 8: Market Sentiment
-    if (cyclePosition === 8) return 'real_sentiment_meter';
+    // Post 8: Candlestick Lesson or Scam Awareness
+    if (cyclePosition === 8) return Math.random() < 0.6 ? 'candlestick_lesson' : 'scam_awareness';
     
     // Post 9: Paper Trading Comparison (Both Exchanges)
     if (cyclePosition === 9) return 'paper_trading_report';
     
-    // Post 10/0: Advanced Educational Content
-    if (cyclePosition === 0) return 'personalized_lesson';
+    // Post 10/0: Risk Management or Advanced Content
+    if (cyclePosition === 0) return Math.random() < 0.5 ? 'risk_management_tip' : 'personalized_lesson';
     
     if (this.postCounter % 10 === 0) return 'real_transparency';
     if (this.postCounter % 7 === 0) return 'educational_content';
@@ -991,6 +991,17 @@ class AuthenticCMCEngine {
         return this.generateRiskManagementPost(insight.data);
       case 'scam_awareness':
         return this.generateScamAwarenessPost(insight.data);
+      // NEW: Comprehensive educational content types
+      case 'order_placement_tutorial':
+        return this.tradingStatsReporter.getOrderPlacementTutorial();
+      case 'technical_analysis_lesson':
+        return this.tradingStatsReporter.getTechnicalAnalysisLesson();
+      case 'candlestick_lesson':
+        return this.tradingStatsReporter.getCandlestickLesson();
+      case 'strategy_education':
+        return this.tradingStatsReporter.getStrategyEducation();
+      case 'risk_scenario':
+        return this.tradingStatsReporter.getRiskScenarioEducation();
       case 'mcp_enhanced_educational':
         return await this.generateMCPEnhancedEducationalPost(insight.data);
       case 'az_token_educational':

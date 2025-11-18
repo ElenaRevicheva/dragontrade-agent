@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from './db-config.js';
+import EducationalContentLibrary from './educational-content-library.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,9 @@ class TradingStatsReporter {
       generic: 0
     };
     this.reportHistory = [];
+    
+    // NEW: Initialize comprehensive educational content library
+    this.educationalLibrary = new EducationalContentLibrary();
   }
 
   // READ REAL TRADING STATS FROM SPECIFIC EXCHANGE
@@ -391,6 +395,40 @@ class TradingStatsReporter {
     ];
 
     return insights[Math.floor(Math.random() * insights.length)];
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW COMPREHENSIVE EDUCATIONAL CONTENT METHODS
+  // ═══════════════════════════════════════════════════════════
+
+  // Get order placement tutorial
+  getOrderPlacementTutorial() {
+    return this.educationalLibrary.getOrderPlacementTutorial();
+  }
+
+  // Get technical analysis lesson
+  getTechnicalAnalysisLesson() {
+    return this.educationalLibrary.getTechnicalAnalysisLesson();
+  }
+
+  // Get candlestick pattern lesson
+  getCandlestickLesson() {
+    return this.educationalLibrary.getCandlestickLesson();
+  }
+
+  // Get strategy education
+  getStrategyEducation() {
+    return this.educationalLibrary.getStrategyEducation();
+  }
+
+  // Get practical risk scenario
+  getRiskScenarioEducation() {
+    return this.educationalLibrary.getRiskScenarioEducation();
+  }
+
+  // Get any random educational content
+  getRandomEducationalContent() {
+    return this.educationalLibrary.getRandomEducationalContent();
   }
 
   // GENERATE COMPARISON TO HODL
