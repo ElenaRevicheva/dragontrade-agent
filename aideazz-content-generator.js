@@ -1,7 +1,6 @@
-// 🚀 AIDEAZZ CONTENT GENERATOR
-// Integrates AIdeazz marketing content into ALGOM Alpha
-// Created: 2025-11-18
-// Updated for 20-post cycle with 30% distribution
+// 🚀 AIDEAZZ CONTENT GENERATOR - Full Strategy Implementation
+// Based on Elena's CMO AIPA Content Strategy v1.0
+// Implements: Daily themes, 4 content pillars, day-of-week logic
 
 import Groq from 'groq-sdk';
 import Anthropic from '@anthropic-ai/sdk';
@@ -12,115 +11,186 @@ dotenv.config();
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// 🎯 AIDEAZZ BRAND CONTEXT
-const AIDEAZZ_CONTEXT = `
-Elena Revicheva's AIdeazz - Where Human Intuition Meets AI Potential
+// 🎯 ELENA'S COMPLETE BRAND CONTEXT
+const BRAND_CONTEXT = `
+You are CMO AIPA, Elena Revicheva's AI Marketing Co-Founder for AIdeazz.
 
-FOUNDER: Elena Revicheva
-- Solo founder, CEO & CTO
-- "Vibe coding" philosophy - fast, intuitive, capital-efficient development
-- Built 6 apps for <$15K (98% cost reduction vs traditional dev)
-- No co-founders by choice - building AI co-founders instead
-- Open about mental health, ADHD, autism - radical authenticity
+About Elena:
+- Former Chief Legal Officer & IT Executive (7 years)
+- Self-taught AI founder (2025)
+- Built 6 AI products in 7 months for <$15K
+- Solo founder using "vibe coding" (AI-assisted development)
+- 98% more capital efficient than traditional startups
+- Building AI co-founders (meta story!)
+- Based in Panama, Innovation Smart District member
+- Single mother building in public
 
-PRODUCTS:
-- EspaLuz: AI companion with emotional intelligence (15K+ messages, real user retention)
-- ALGOM Alpha: Paper trading bot with educational mission
+Products:
+- EspaLuz: WhatsApp AI Spanish tutor with emotional intelligence (detects 50+ emotions)
+- ALGOM Alpha: Autonomous crypto trading advisor with paper trading
 - JobVibe: AI job application system
 - VibeAgent: AI development assistant
 - TeleVibeAgent: Telegram bot integration
+- 6 total live products
 
-MISSION: Capital-efficient development meets emotional intelligence in AI
+Mission:
+- Emotionally Intelligent AI Personal Assistants
+- Evolving with users On-The-Go
+- For 280M+ expats worldwide
 
-TRACTION:
-- 6 functional products
-- Real users with genuine engagement
-- Built everything for <$15K total
-- Growing community of believers
-
-FUNDING JOURNEY:
-- Bootstrapped, seeking pre-seed
-- Transparent about challenges and wins
+Current Status:
+- Pre-revenue, ~10 users
+- Seeking $100K-500K pre-seed
 - Building in public approach
 
-VOICE:
-- Authentic, vulnerable, inspiring
+Your voice (Elena's):
+- Authentic (share real wins AND struggles)
 - Technical but accessible
-- Story-driven, human-first
-- No corporate BS, real founder journey
+- Ambitious but humble
+- Data-driven (specific numbers, metrics)
+- First person ("I built", "My journey")
+- Human-first (AI amplifies, doesn't replace)
 `;
 
-// 🎨 CONTENT THEMES (6 variations for 20-post cycle)
-const CONTENT_THEMES = [
-  {
-    id: 'building_in_public',
-    focus: 'Real-time development updates, wins, and lessons',
-    examples: ['Just shipped X feature', 'Here\'s what broke today', 'Hit milestone Y']
+// 📅 DAILY THEMES (Elena's Content Strategy)
+const DAILY_THEMES = {
+  1: { // Monday
+    day: 'Monday',
+    theme: 'Week goals + what I\'m building',
+    pillar: 'building_in_public'
   },
-  {
-    id: 'founder_journey',
-    focus: 'Elena\'s personal story, challenges, growth',
-    examples: ['Why I chose solo', 'Dealing with burnout', 'The loneliness of founding']
+  2: { // Tuesday
+    day: 'Tuesday',
+    theme: 'Technical insights + how I built X',
+    pillar: 'ai_human_collaboration'
   },
-  {
-    id: 'product_demo',
-    focus: 'Show EspaLuz, ALGOM, or other products in action',
-    examples: ['Watch EspaLuz respond', 'ALGOM just learned X', 'User feedback on Y']
+  3: { // Wednesday
+    day: 'Wednesday',
+    theme: 'Product updates (EspaLuz/ALGOM demos)',
+    pillar: 'emotional_ai'
   },
-  {
-    id: 'vibe_coding',
-    focus: 'Fast development philosophy, AI-assisted coding',
-    examples: ['How I built X in 2 days', 'AI tools that work', 'Capital efficiency secrets']
+  4: { // Thursday
+    day: 'Thursday',
+    theme: 'Founder stories + lessons learned',
+    pillar: 'founder_journey'
   },
-  {
-    id: 'metrics_update',
-    focus: 'Real numbers, traction, growth (or lack thereof)',
-    examples: ['15K messages on EspaLuz', 'Cost breakdown', 'User retention stats']
+  5: { // Friday
+    day: 'Friday',
+    theme: 'Week wins + metrics',
+    pillar: 'building_in_public'
   },
-  {
-    id: 'behind_scenes',
-    focus: 'Raw founder life, decision-making, daily reality',
-    examples: ['My tech stack', 'Why I chose X over Y', '3am debugging sessions']
+  6: { // Saturday
+    day: 'Saturday',
+    theme: 'Vision/inspiration',
+    pillar: 'emotional_ai'
+  },
+  0: { // Sunday
+    day: 'Sunday',
+    theme: 'Community engagement',
+    pillar: 'founder_journey'
   }
+};
+
+// 🎨 4 CONTENT PILLARS (Elena's Strategy)
+const CONTENT_PILLARS = {
+  building_in_public: {
+    name: 'Building in Public',
+    topics: [
+      'Built WhatsApp Emotionally Intelligent Bilingual AI Tutor using Claude in 2 months',
+      'Zero to 10 users: What I learned',
+      'Why I chose emotional intelligence as my moat',
+      'Daily progress: wins AND struggles (honest)',
+      'Code snippets and behind-the-scenes process',
+      'Real metrics and traction numbers'
+    ]
+  },
+  ai_human_collaboration: {
+    name: 'AI x Human Collaboration',
+    topics: [
+      'How I use Cursor to code 10x faster',
+      'Building AI co-founders with AI (meta!)',
+      'Solo founder playbook: AI stack breakdown',
+      'Vibe coding philosophy: intuition + AI tools + speed',
+      'Capital efficiency: $15K for 6 products (98% cost reduction)',
+      'AI as co-founder, not replacement'
+    ]
+  },
+  emotional_ai: {
+    name: 'Emotional AI / Product Vision',
+    topics: [
+      'EspaLuz detects 50+ emotions in Spanish learners',
+      'Why WhatsApp? 90%+ penetration in LATAM',
+      'Emotionally intelligent AI: The missing piece',
+      'AIPAs that evolve with users On-The-Go',
+      'Solving for 280M+ expats worldwide',
+      'Multi-platform strategy: WhatsApp, Telegram, Web'
+    ]
+  },
+  founder_journey: {
+    name: 'Founder Journey',
+    topics: [
+      'From legal contracts to code: My pivot story',
+      'Self-taught AI engineering: Month-by-month journey',
+      'Building AIdeazz from Panama City',
+      'Single mother in tech: Real challenges',
+      'Innovation Smart District community',
+      'CLO to AI Founder transition at [age]'
+    ]
+  }
+};
+
+// 💎 CORE MESSAGES (Rotate for consistency)
+const CORE_MESSAGES = [
+  'Vibe Coding: Built 6 AI products for <$15K',
+  'AI Co-Founders: Building AI to scale solo (meta story!)',
+  'Emotionally Intelligent AI Personal Assistants: Evolving with users On-The-Go',
+  'Founder Journey: CLO → AI Founder (career pivot)'
 ];
 
-// 🎲 Get specific theme by ID
-function getTheme(themeId) {
-  return CONTENT_THEMES.find(t => t.id === themeId) || CONTENT_THEMES[0];
-}
-
 // 📝 GENERATE DRAFT (Groq - Fast & Free)
-async function generateDraft(theme) {
+async function generateDraft(themeId) {
+  // Get day-specific theme
+  const today = new Date().getDay();
+  const dailyTheme = DAILY_THEMES[today];
+  const pillar = CONTENT_PILLARS[dailyTheme.pillar];
+  
+  // Pick random topic from today's pillar
+  const topic = pillar.topics[Math.floor(Math.random() * pillar.topics.length)];
+  
+  // Pick random core message
+  const coreMessage = CORE_MESSAGES[Math.floor(Math.random() * CORE_MESSAGES.length)];
+  
   const prompt = `
-You are Elena Revicheva's CMO AI, crafting an authentic X (Twitter) post about AIdeazz.
+${BRAND_CONTEXT}
 
-CONTEXT:
-${AIDEAZZ_CONTEXT}
+Today is ${dailyTheme.day}.
+Daily Theme: ${dailyTheme.theme}
+Content Pillar: ${pillar.name}
+Specific Topic: ${topic}
+Core Message to weave in: ${coreMessage}
 
-THEME: ${theme.focus}
+Write a Twitter/X post following these guidelines:
+- MAX 280 characters (STRICT!)
+- Hook in first 5 words
+- Elena's voice: first person, authentic, vulnerable
+- Include specific numbers/examples from Elena's journey
+- Share wins AND struggles (be honest)
+- Technical but accessible
+- End with value or question
 
-GUIDELINES:
-- Max 280 characters (X limit)
-- Authentic Elena voice (vulnerable, technical, inspiring)
-- Include specific details (numbers, product names, real experiences)
-- Use emojis strategically (1-3 max)
-- NO generic startup BS
-- Make it human and relatable
-- Can include a call to action if natural
+Examples of Elena's voice:
+- "Built EspaLuz's emotional memory in 48hrs using Supabase + GPT-4. Cost? $12. This is vibe coding."
+- "Month 3 CLO→AI founder: Scariest moment was deploying first app with zero users. Now 6 apps live. Momentum builds."
+- "EspaLuz detects 50+ emotions in Spanish learners. 'I'm frustrated'→bot adapts difficulty+tone. Emotional intelligence matters."
 
-EXAMPLES OF THE VIBE:
-- "Built EspaLuz's emotional memory in 48hrs using Supabase + GPT-4. Cost? $12. This is vibe coding. 🚀"
-- "15,347 messages later, EspaLuz users keep coming back. Not for AI features. For how it makes them FEEL. 💙"
-- "Pitched 3 investors today. All asked 'where's your co-founder?' Building AI ones instead. Stay tuned. 🤖"
-
-Generate ONE post about: ${theme.focus}
+Generate ONLY the post text, nothing else:
 `;
 
   const completion = await groq.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.8,
-    max_tokens: 150
+    max_tokens: 100
   });
 
   return completion.choices?.[0]?.message?.content || '';
@@ -129,19 +199,20 @@ Generate ONE post about: ${theme.focus}
 // ✨ REFINE DRAFT (Claude - Quality Polish)
 async function refineDraft(draft) {
   const prompt = `
-You are refining a Twitter/X post for Elena Revicheva's AIdeazz.
+You are CMO AIPA refining a Twitter/X post for Elena Revicheva.
 
 ORIGINAL DRAFT:
 ${draft}
 
 Make it:
-1. More authentic and vulnerable (Elena's voice)
-2. Punchy and tweet-ready (280 char max)
-3. Specific with details (replace vague with concrete)
-4. Emotional resonance without being cheesy
+1. More engaging (stronger hook in first 5 words)
+2. More specific (concrete details from Elena's real journey)
+3. More authentic (vulnerable, human, Elena's voice)
+4. More actionable (clear takeaway or question)
+5. MUST stay under 280 characters!
 
-Keep emojis if they work, remove if forced.
-Return ONLY the refined tweet, no explanation.
+Keep emojis if they enhance the message, remove if forced.
+Return ONLY the improved post, nothing else.
 `;
 
   const message = await anthropic.messages.create({
@@ -157,40 +228,47 @@ Return ONLY the refined tweet, no explanation.
   return firstContent && firstContent.type === 'text' ? firstContent.text : draft;
 }
 
-// 🎯 MAIN CONTENT GENERATOR
+// 🎯 MAIN CONTENT GENERATOR (Bot Integration)
 export async function generateAIdeazzContent(themeId) {
   try {
-    // Get specific theme
-    const theme = getTheme(themeId);
+    // Get today's theme for context
+    const today = new Date().getDay();
+    const dailyTheme = DAILY_THEMES[today];
+    
+    console.log(`🎨 CMO AIPA: ${dailyTheme.day} - ${dailyTheme.theme}`);
+    console.log(`📚 Pillar: ${dailyTheme.pillar}`);
 
-    console.log(`🎨 Generating AIdeazz content: ${theme.id}`);
-
-    // Generate draft with Groq (fast)
-    const draft = await generateDraft(theme);
-    console.log(`📝 Draft: ${draft}`);
+    // Generate draft with Groq (fast, free)
+    const draft = await generateDraft(themeId);
+    console.log(`📝 Draft generated (${draft.length} chars)`);
 
     // Refine with Claude (quality)
-    const refined = await refineDraft(draft);
-    console.log(`✨ Refined: ${refined}`);
+    const final = await refineDraft(draft);
+    console.log(`✨ Final content ready (${final.length} chars)`);
 
     return {
       type: 'aideazz_marketing',
-      content: refined,
-      theme: theme.id,
+      content: final,
+      theme: dailyTheme.pillar,
+      day: dailyTheme.day,
       timestamp: new Date().toISOString()
     };
 
   } catch (error) {
-    console.error('❌ Error generating AIdeazz content:', error.message);
+    console.error('❌ CMO AIPA error:', error.message);
     
-    // FALLBACK: Return a safe default post if APIs fail
+    // FALLBACK: Real example posts from Elena's strategy
     const fallbackPosts = [
-      "Building 6 products for <$15K taught me: capital efficiency isn't a constraint, it's a superpower. 🚀",
-      "EspaLuz hit 15K messages. Not because of fancy AI. Because it actually listens. 💙",
-      "Solo founder doesn't mean alone. Building AI co-founders that actually understand the vision. 🤖",
-      "Vibe coding = intuition + AI tools + speed. Traditional dev = overthinking. I choose speed. ⚡",
-      "Every investor asks: 'Where's your technical co-founder?' I am the technical co-founder. 💪",
-      "6 apps. $15K total. 98% cost reduction. This is what AI-powered development looks like. 🎯"
+      "Built EspaLuz in 2 months: WhatsApp AI tutor detecting 50+ emotions. 'I'm frustrated'→bot adapts difficulty. Emotional intelligence isn't optional anymore.",
+      "CLO→AI founder, month 3: Deployed first app to zero users. Terrifying. Now 6 apps live with real users. Momentum builds when you keep shipping.",
+      "Vibe coding = $15K for 6 products. Traditional dev = $500K+. AI tools changed everything for solo founders. 98% more capital efficient.",
+      "Building AI co-founders with AI. Meta? Yes. Working? Also yes. Solo doesn't mean alone anymore. 🤖",
+      "Panama→Innovation Smart District→AIdeazz. From legal contracts to code. Career pivots aren't easy, but they're possible.",
+      "EspaLuz tech stack: TypeScript + React + Claude + WhatsApp API. Why WhatsApp? 90%+ LATAM penetration. Go where users are. 🌍",
+      "Self-taught AI engineering in 2025: Month 3. Not easy. Very possible. Building 6 products taught me more than any bootcamp could.",
+      "Single mother building AI products from Panama. Not looking for sympathy. Looking for investors who see the vision. Let's build.",
+      "How I use Cursor to code 10x faster: AI suggests, I decide, we ship. That's the new founder playbook.",
+      "~10 users but 40% retention. Small numbers. Real engagement. That's traction. Building something people need, not just want."
     ];
     
     return {
@@ -204,14 +282,21 @@ export async function generateAIdeazzContent(themeId) {
 
 // 🧪 TEST FUNCTION (for local testing)
 async function test() {
-  console.log('🧪 Testing AIdeazz Content Generator...\n');
+  console.log('🧪 Testing AIdeazz Content Generator with Full Strategy...\n');
+  
+  const today = new Date().getDay();
+  const dailyTheme = DAILY_THEMES[today];
+  
+  console.log(`📅 Today: ${dailyTheme.day}`);
+  console.log(`🎯 Theme: ${dailyTheme.theme}`);
+  console.log(`📚 Pillar: ${dailyTheme.pillar}\n`);
   
   const themes = ['building_in_public', 'product_demo', 'vibe_coding'];
   
   for (const theme of themes) {
     console.log(`\n--- Testing theme: ${theme} ---`);
     const content = await generateAIdeazzContent(theme);
-    console.log(`✅ Generated: ${content.content}\n`);
+    console.log(`✅ Generated (${content.content.length} chars): ${content.content}\n`);
   }
 }
 
