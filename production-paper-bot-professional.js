@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { writeStatsToDatabase } from './db-stats-writer.js';
 
 dotenv.config();
 
@@ -937,12 +938,22 @@ class ProfessionalPaperTradingBot {
     };
     
     try {
+      // Write to database (primary method for multi-service access)
+      const dbSuccess = await writeStatsToDatabase(this.config.exchange.toLowerCase(), statsData);
+      
+      // Also write to JSON files (backup/local access)
       const exchangeName = this.config.exchange.toLowerCase();
       const statsPath = path.join(__dirname, `${exchangeName}_trading_stats.json`);
       await fs.writeFile(statsPath, JSON.stringify(statsData, null, 2));
       
       const genericStatsPath = path.join(__dirname, 'trading_stats.json');
       await fs.writeFile(genericStatsPath, JSON.stringify(statsData, null, 2));
+      
+      if (dbSuccess) {
+        console.log(`✅ Stats exported (DB + JSON files)`);
+      } else {
+        console.log(`✅ Stats exported (JSON files only - DB not configured)`);
+      }
     } catch (error) {
       console.error('⚠️  Failed to export stats:', error.message);
     }
