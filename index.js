@@ -1355,6 +1355,30 @@ class AuthenticTwitterClient {
     this.postCount = 0;
     this.lastTimelineCheck = 0;
     
+    // 🚀 CMO AIPA: 20-post optimized cycle (30% paper trading, 30% AIdeazz, 40% educational)
+    this.CONTENT_CYCLE = [
+      { type: 'educational' },                             // 1  - Start with value
+      { type: 'aideazz', theme: 'building_in_public' },    // 2  - Show transparency
+      { type: 'paper_trading', exchange: 'bybit' },        // 3  ← Paper trading
+      { type: 'educational' },                             // 4  - More education
+      { type: 'aideazz', theme: 'founder_journey' },       // 5  - Personal story
+      { type: 'educational' },                             // 6  - Risk management
+      { type: 'paper_trading', exchange: 'binance' },      // 7  ← Paper trading
+      { type: 'educational' },                             // 8  - Technical analysis
+      { type: 'aideazz', theme: 'product_demo' },          // 9  - Show products
+      { type: 'educational' },                             // 10 - Trading psychology
+      { type: 'paper_trading', exchange: 'both' },         // 11 ← Paper trading
+      { type: 'educational' },                             // 12 - Strategy knowledge
+      { type: 'aideazz', theme: 'vibe_coding' },           // 13 - Development speed
+      { type: 'educational' },                             // 14 - Order mechanics
+      { type: 'paper_trading', exchange: 'bybit' },        // 15 ← Paper trading
+      { type: 'aideazz', theme: 'metrics_update' },        // 16 - Traction numbers
+      { type: 'educational' },                             // 17 - Scam alerts
+      { type: 'paper_trading', exchange: 'binance' },      // 18 ← Paper trading
+      { type: 'aideazz', theme: 'behind_scenes' },         // 19 - Raw founder life
+      { type: 'paper_trading', exchange: 'both' }          // 20 ← Paper trading
+    ];
+    
     // Add helper methods for post tracking
     this.getPostTypeFromCyclePosition = getPostTypeFromCyclePosition;
     this.getExchangeFromContent = getExchangeFromContent;
