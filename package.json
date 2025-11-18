@@ -9,6 +9,7 @@
     "dev": "node index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
     "@elizaos/core": "^0.1.7",
     "@elizaos/plugin-coinmarketcap": "^0.1.7",
     "@elizaos/plugin-twitter": "^0.1.7",
@@ -17,6 +18,7 @@
     "ccxt": "^4.5.7",
     "dotenv": "^16.0.0",
     "express": "^4.18.2",
+    "groq-sdk": "^0.35.0",
     "pg": "^8.11.3",
     "sharp": "^0.33.0",
     "twitter-api-v2": "^1.24.0",

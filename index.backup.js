@@ -15,7 +15,6 @@ import { MCPHealthMonitor } from './mcp-health-monitor.js';
 import TradingStatsReporter from './educational-bot-integration.js';
 import postLogger from './post-logger.js';
 import { getPostTypeFromCyclePosition, getExchangeFromContent } from './post-tracking-helper.js';
-import { generateAIdeazzContent } from './aideazz-content-generator.js';
 
 dotenv.config();
 
@@ -62,30 +61,6 @@ class CryptoEducationEngine {
     // Rate limiting for API calls to prevent overwhelming the server
     this.lastAPICall = 0;
     this.apiCallInterval = 2000; // 2 seconds between API calls (30 RPM limit)
-    
-    // 🚀 CMO AIPA: 20-post optimized cycle (30% paper trading, 30% AIdeazz, 40% educational)
-    this.CONTENT_CYCLE = [
-      { type: 'educational' },                             // 1  - Start with value
-      { type: 'aideazz', theme: 'building_in_public' },    // 2  - Show transparency
-      { type: 'paper_trading', exchange: 'bybit' },        // 3  ← Paper trading
-      { type: 'educational' },                             // 4  - More education
-      { type: 'aideazz', theme: 'founder_journey' },       // 5  - Personal story
-      { type: 'educational' },                             // 6  - Risk management
-      { type: 'paper_trading', exchange: 'binance' },      // 7  ← Paper trading
-      { type: 'educational' },                             // 8  - Technical analysis
-      { type: 'aideazz', theme: 'product_demo' },          // 9  - Show products
-      { type: 'educational' },                             // 10 - Trading psychology
-      { type: 'paper_trading', exchange: 'both' },         // 11 ← Paper trading
-      { type: 'educational' },                             // 12 - Strategy knowledge
-      { type: 'aideazz', theme: 'vibe_coding' },           // 13 - Development speed
-      { type: 'educational' },                             // 14 - Order mechanics
-      { type: 'paper_trading', exchange: 'bybit' },        // 15 ← Paper trading
-      { type: 'aideazz', theme: 'metrics_update' },        // 16 - Traction numbers
-      { type: 'educational' },                             // 17 - Scam alerts
-      { type: 'paper_trading', exchange: 'binance' },      // 18 ← Paper trading
-      { type: 'aideazz', theme: 'behind_scenes' },         // 19 - Raw founder life
-      { type: 'paper_trading', exchange: 'both' }          // 20 ← Paper trading
-    ];
   }
 
   async initializeMCP() {
@@ -1607,149 +1582,54 @@ class AuthenticTwitterClient {
   async createAuthenticPost() {
     try {
       this.postCount++;
-      console.log(`\n🎯 [Post #${this.postCount}] Starting authentic content generation...`);
+      console.log(`🎯 Creating 100% AUTHENTIC post #${this.postCount}...`);
       
-      // 🆕 CMO AIPA: Determine content type from 20-post cycle
-      const cyclePosition = (this.postCount - 1) % 20;
-      const contentConfig = this.CONTENT_CYCLE[cyclePosition];
+      console.log('📊 [POST] Fetching REAL market data...');
+      const realMarketData = await this.cmcEngine.getCMCData();
       
-      console.log(`📊 Cycle position: ${cyclePosition + 1}/20`);
-      console.log(`🎨 Content type: ${contentConfig.type}`);
-      if (contentConfig.theme) console.log(`🎭 Theme: ${contentConfig.theme}`);
-      if (contentConfig.exchange) console.log(`💱 Exchange: ${contentConfig.exchange}`);
+      console.log('🧠 [POST] Generating AUTHENTIC content...');
+      console.log('📈 [POST] Data available:', realMarketData.data_available ? 'YES - Real CMC data' : 'NO - API unavailable');
       
-      let authenticContent;
+      const authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
       
-      // 🎯 CONTENT TYPE ROUTER
-      switch(contentConfig.type) {
-        case 'paper_trading':
-          // ✅ PRESERVED: Original paper trading logic
-          console.log(`📊 [PAPER TRADING] Generating ${contentConfig.exchange} report...`);
-          try {
-            // Check if we have the paper trading integration methods
-            if (typeof this.getRecentPaperTrade === 'function') {
-              const recentTrade = await this.getRecentPaperTrade(contentConfig.exchange);
-              if (recentTrade) {
-                authenticContent = await this.formatPaperTradingPost(recentTrade);
-                if (typeof this.storePaperTradingPost === 'function') {
-                  await this.storePaperTradingPost(recentTrade);
-                }
-              } else {
-                console.log('⚠️ No recent trade data, generating educational content instead');
-                const realMarketData = await this.cmcEngine.getCMCData();
-                authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
-              }
-            } else {
-              // Paper trading methods not available, fall back to educational
-              console.log('⚠️ Paper trading methods not available, generating educational content');
-              const realMarketData = await this.cmcEngine.getCMCData();
-              authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
-            }
-          } catch (error) {
-            console.error('❌ Paper trading error:', error.message);
-            const realMarketData = await this.cmcEngine.getCMCData();
-            authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
-          }
-          break;
+      console.log('🔥 [POST] Posting 100% AUTHENTIC content:', authenticContent.substring(0, 60) + '...');
+      console.log('📊 [POST] Contains real numbers:', /\$[\d,]+/.test(authenticContent) ? '✅ YES' : '⚠️ Data unavailable');
+      console.log('🚫 [POST] Contains predictions:', /predict|expect|will|should|target/i.test(authenticContent) ? '❌ YES (ERROR)' : '✅ NO');
+      console.log('🎓 [POST] Educational features:', /MCP|AZ Token|Educational/i.test(authenticContent) ? '✅ ENHANCED' : '📚 Standard');
+      
+      // Enhanced rate limiting and retry logic
+      const tweet = await this.postWithRetry(authenticContent);
+      
+      if (tweet) {
+        console.log('✅ 100% AUTHENTIC POST PUBLISHED!');
+        console.log('🐉 Tweet ID:', tweet.data.id);
+        console.log('📊 Content length:', authenticContent.length);
+        console.log('🏆 Authentic posts delivered:', this.postCount);
+        console.log('🎯 Reputation: Building through transparency + education...');
+        
+        // Log post to database for tracking and reporting
+        try {
+          const cyclePosition = this.postCount % 10;
+          const postType = this.getPostTypeFromCyclePosition(cyclePosition);
+          const exchange = this.getExchangeFromContent(authenticContent, cyclePosition);
           
-        case 'aideazz':
-          // 🚀 NEW: AIdeazz marketing content
-          console.log(`🚀 [AIDEAZZ] Generating ${contentConfig.theme} content...`);
-          try {
-            const aideazzResult = await generateAIdeazzContent(contentConfig.theme);
-            authenticContent = aideazzResult.content;
-          } catch (error) {
-            console.error('❌ AIdeazz generation error:', error.message);
-            // Fallback to educational
-            const realMarketData = await this.cmcEngine.getCMCData();
-            authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
-          }
-          break;
-          
-        case 'educational':
-        default:
-          // ✅ PRESERVED: Original educational content logic
-          // This includes: TA, risk management, psychology, strategies, order mechanics, scam alerts, sentiment
-          console.log(`📚 [EDUCATIONAL] Generating comprehensive trading education...`);
-          const realMarketData = await this.cmcEngine.getCMCData();
-          authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
-          break;
-      }
-      
-      // ✅ PRESERVED: Rest of original posting logic
-      if (!authenticContent) {
-        console.log('⚠️ No content generated, skipping post');
-        return null;
-      }
-      
-      // Enforce character limit
-      if (authenticContent.length > 280) {
-        console.log(`⚠️ Content too long (${authenticContent.length} chars), truncating...`);
-        authenticContent = authenticContent.substring(0, 277) + '...';
-      }
-      
-      console.log(`\n📝 Generated content (${authenticContent.length} chars):`);
-      console.log(authenticContent);
-      console.log('\n📤 Posting to X...');
-      
-      // Use retry logic if available, otherwise direct post
-      let response;
-      if (typeof this.postWithRetry === 'function') {
-        response = await this.postWithRetry(authenticContent);
-      } else {
-        response = await this.twitterClient.v2.tweet({
-          text: authenticContent
-        });
-      }
-      
-      if (!response || !response.data) {
-        console.log('⚠️ No response from Twitter API');
-        return null;
-      }
-      
-      console.log('✅ Post successful!');
-      console.log(`🆔 Tweet ID: ${response.data.id}`);
-      
-      // ✅ PRESERVED: Database logging (if postLogger exists)
-      try {
-        if (typeof postLogger?.logPost === 'function') {
           await postLogger.logPost(
             this.postCount,
-            contentConfig.type,
+            postType,
             authenticContent,
-            contentConfig.exchange || null,
-            { 
-              tweetId: response.data.id, 
-              cyclePosition: cyclePosition + 1,
-              theme: contentConfig.theme || null
-            }
+            exchange,
+            { tweetId: tweet.data.id, cyclePosition }
           );
-          console.log('📊 Post logged to database');
+        } catch (logError) {
+          console.error('⚠️ Failed to log post to database:', logError.message);
         }
-      } catch (logError) {
-        console.error('⚠️ Database logging failed (non-critical):', logError.message);
       }
       
-      // ✅ PRESERVED: Rate limit tracking (if exists)
-      if (this.rateLimitTracker) {
-        this.rateLimitTracker.lastPost = Date.now();
-        this.rateLimitTracker.postsToday = (this.rateLimitTracker.postsToday || 0) + 1;
-        this.rateLimitTracker.consecutiveFailures = 0;
-        console.log('⏱️ Rate limit tracker updated');
-      }
-      
-      return response;
-      
+      return tweet;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('\n❌ Error in createAuthenticPost:', errorMessage);
-      
-      // ✅ PRESERVED: Rate limit failure tracking (if exists)
-      if (this.rateLimitTracker) {
-        this.rateLimitTracker.consecutiveFailures = (this.rateLimitTracker.consecutiveFailures || 0) + 1;
-      }
-      
-      throw error;
+      console.error('❌ Authentic post failed:', error.message);
+      console.error('🔧 Will retry on next cycle...');
+      return null;
     }
   }
 
