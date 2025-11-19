@@ -1424,11 +1424,19 @@ class AuthenticTwitterClient {
       console.log('🔗 COINGECKO MCP: Real-time API integration active!');
       
       this.isActive = true;
+      console.log('🚀 Starting authentic posting...');
       this.startAuthenticPosting();
+      console.log('🔄 Starting quality reposting...');
       this.startQualityReposting();
+      console.log('✅ Bot fully activated and posting scheduled!');
       return true;
     } catch (error) {
-      console.error('❌ Authentic activation failed:', error.message);
+      console.error('❌ Authentic activation failed!');
+      console.error('❌ Error details:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      if (error.code) console.error('❌ Error code:', error.code);
+      if (error.data) console.error('❌ Error data:', JSON.stringify(error.data, null, 2));
       this.isActive = false;
       return false;
     }
