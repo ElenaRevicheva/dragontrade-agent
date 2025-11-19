@@ -1018,15 +1018,15 @@ class AuthenticCMCEngine {
         return this.generateScamAwarenessPost(insight.data);
       // NEW: Comprehensive educational content types
       case 'order_placement_tutorial':
-        return this.tradingStatsReporter.getOrderPlacementTutorial();
+        return this.coinGeckoEngine.tradingStatsReporter.getOrderPlacementTutorial();
       case 'technical_analysis_lesson':
-        return this.tradingStatsReporter.getTechnicalAnalysisLesson();
+        return this.coinGeckoEngine.tradingStatsReporter.getTechnicalAnalysisLesson();
       case 'candlestick_lesson':
-        return this.tradingStatsReporter.getCandlestickLesson();
+        return this.coinGeckoEngine.tradingStatsReporter.getCandlestickLesson();
       case 'strategy_education':
-        return this.tradingStatsReporter.getStrategyEducation();
+        return this.coinGeckoEngine.tradingStatsReporter.getStrategyEducation();
       case 'risk_scenario':
-        return this.tradingStatsReporter.getRiskScenarioEducation();
+        return this.coinGeckoEngine.tradingStatsReporter.getRiskScenarioEducation();
       case 'mcp_enhanced_educational':
         return await this.generateMCPEnhancedEducationalPost(insight.data);
       case 'az_token_educational':
@@ -1210,7 +1210,7 @@ class AuthenticCMCEngine {
       console.log('📊 [PAPER TRADING] Generating real trading stats report...');
       
       // Try to get post from paper trading bot stats
-      const tradingPost = await this.tradingStatsReporter.generatePost('auto');
+      const tradingPost = await this.coinGeckoEngine.tradingStatsReporter.generatePost('auto');
       
       if (tradingPost) {
         console.log('✅ [PAPER TRADING] Real trading stats available!');
