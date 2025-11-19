@@ -16,6 +16,7 @@ import TradingStatsReporter from './educational-bot-integration.js';
 import postLogger from './post-logger.js';
 import { getPostTypeFromCyclePosition, getExchangeFromContent } from './post-tracking-helper.js';
 import { generateAIdeazzContent } from './aideazz-content-generator.js';
+import { prepareThread, validateThreadChunks, needsThreading } from './twitter-thread-helper.js';
 
 dotenv.config();
 
@@ -1725,24 +1726,25 @@ class AuthenticTwitterClient {
         return null;
       }
       
-      // Enforce character limit
-      if (authenticContent.length > 280) {
-        console.log(`⚠️ Content too long (${authenticContent.length} chars), truncating...`);
-        authenticContent = authenticContent.substring(0, 277) + '...';
-      }
-      
       console.log(`\n📝 Generated content (${authenticContent.length} chars):`);
       console.log(authenticContent);
-      console.log('\n📤 Posting to X...');
       
-      // Use retry logic if available, otherwise direct post
+      // 🧵 NEW: Smart thread handling
       let response;
-      if (typeof this.postWithRetry === 'function') {
-        response = await this.postWithRetry(authenticContent);
+      if (needsThreading(authenticContent, 280)) {
+        console.log(`🧵 Content needs threading (${authenticContent.length} chars)`);
+        response = await this.postThread(authenticContent);
       } else {
-        response = await this.twitterClient.v2.tweet({
-          text: authenticContent
-        });
+        console.log('\n📤 Posting single tweet to X...');
+        
+        // Use retry logic if available, otherwise direct post
+        if (typeof this.postWithRetry === 'function') {
+          response = await this.postWithRetry(authenticContent);
+        } else {
+          response = await this.twitterClient.v2.tweet({
+            text: authenticContent
+          });
+        }
       }
       
       if (!response || !response.data) {
@@ -1756,18 +1758,27 @@ class AuthenticTwitterClient {
       // ✅ PRESERVED: Database logging (if postLogger exists)
       try {
         if (typeof postLogger?.logPost === 'function') {
+          const metadata = { 
+            tweetId: response.data.id, 
+            cyclePosition: cyclePosition + 1,
+            theme: contentConfig.theme || null
+          };
+          
+          // Add thread metadata if it's a thread
+          if (response.meta?.isThread) {
+            metadata.isThread = true;
+            metadata.threadLength = response.meta.threadLength;
+            metadata.allTweetIds = response.meta.allTweetIds;
+          }
+          
           await postLogger.logPost(
             this.postCount,
             contentConfig.type,
             authenticContent,
             contentConfig.exchange || null,
-            { 
-              tweetId: response.data.id, 
-              cyclePosition: cyclePosition + 1,
-              theme: contentConfig.theme || null
-            }
+            metadata
           );
-          console.log('📊 Post logged to database');
+          console.log('📊 Post logged to database' + (response.meta?.isThread ? ` (thread: ${response.meta.threadLength} tweets)` : ''));
         }
       } catch (logError) {
         console.error('⚠️ Database logging failed (non-critical):', logError.message);
@@ -1844,6 +1855,137 @@ class AuthenticTwitterClient {
     
     console.log(`📊 [RATE LIMIT] Posts today: ${this.rateLimitTracker.postsToday}/${this.rateLimitTracker.maxDailyPosts}`);
     return true;
+  }
+
+  /**
+   * Post a Twitter thread (multiple connected tweets)
+   * @param {string} content - Full content to post as thread
+   * @returns {object} Response from first tweet (to maintain compatibility)
+   */
+  async postThread(content) {
+    try {
+      console.log('🧵 [THREAD] Preparing thread...');
+      
+      // Prepare thread chunks
+      const chunks = prepareThread(content, {
+        maxLength: 270, // Leave room for thread indicators
+        indicatorStyle: 'numbers' // Use [1/3], [2/3], [3/3] format
+      });
+      
+      console.log(`🧵 [THREAD] Split into ${chunks.length} tweets`);
+      
+      // Validate chunks
+      const validation = validateThreadChunks(chunks, 280);
+      if (!validation.valid) {
+        console.error('❌ [THREAD] Validation failed:', validation.errors);
+        throw new Error('Thread validation failed: ' + validation.errors.join(', '));
+      }
+      
+      if (validation.warnings.length > 0) {
+        console.warn('⚠️ [THREAD] Warnings:', validation.warnings);
+      }
+      
+      // Check rate limits before posting thread
+      if (!this.checkRateLimits()) {
+        console.log('⏰ [RATE LIMIT] Skipping thread due to rate limits');
+        return null;
+      }
+      
+      const postedTweets = [];
+      let previousTweetId = null;
+      
+      // Post each tweet in the thread
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const isFirst = i === 0;
+        const position = i + 1;
+        
+        console.log(`🧵 [THREAD ${position}/${chunks.length}] Posting...`);
+        console.log(`   Content: ${chunk.substring(0, 50)}...`);
+        
+        try {
+          // Wait between tweets to avoid spam detection (but not before first tweet)
+          if (!isFirst) {
+            const delay = 2500; // 2.5 seconds between thread tweets
+            console.log(`   ⏳ Waiting ${delay}ms before next tweet...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          
+          // Post the tweet
+          const tweetData = {
+            text: chunk
+          };
+          
+          // Add reply reference if not first tweet
+          if (previousTweetId) {
+            tweetData.reply = {
+              in_reply_to_tweet_id: previousTweetId
+            };
+          }
+          
+          const response = await this.client.v2.tweet(tweetData);
+          
+          if (!response || !response.data) {
+            throw new Error('No response from Twitter API');
+          }
+          
+          console.log(`   ✅ Tweet ${position} posted: ${response.data.id}`);
+          
+          postedTweets.push({
+            position,
+            id: response.data.id,
+            content: chunk
+          });
+          
+          previousTweetId = response.data.id;
+          
+          // Update rate limit tracker for each tweet
+          if (this.rateLimitTracker) {
+            this.rateLimitTracker.lastPost = Date.now();
+            this.rateLimitTracker.postsToday++;
+          }
+          
+        } catch (error) {
+          console.error(`❌ [THREAD ${position}/${chunks.length}] Failed to post:`, error.message);
+          
+          // If we fail mid-thread, we have a partial thread problem
+          if (postedTweets.length > 0) {
+            console.error(`⚠️ [THREAD] Partial thread posted (${postedTweets.length}/${chunks.length})`);
+            console.error(`⚠️ [THREAD] Posted tweet IDs:`, postedTweets.map(t => t.id));
+          }
+          
+          throw new Error(`Thread posting failed at tweet ${position}/${chunks.length}: ${error.message}`);
+        }
+      }
+      
+      console.log(`🎉 [THREAD] Complete thread posted successfully!`);
+      console.log(`📊 [THREAD] Posted ${postedTweets.length} tweets`);
+      console.log(`🔗 [THREAD] First tweet ID: ${postedTweets[0].id}`);
+      
+      // Return first tweet response for compatibility with existing code
+      return {
+        data: {
+          id: postedTweets[0].id,
+          text: postedTweets[0].content
+        },
+        meta: {
+          isThread: true,
+          threadLength: postedTweets.length,
+          allTweetIds: postedTweets.map(t => t.id)
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ [THREAD] Thread posting failed:', error.message);
+      
+      // Track failure
+      if (this.rateLimitTracker) {
+        this.rateLimitTracker.consecutiveFailures++;
+        this.rateLimitTracker.lastFailureTime = Date.now();
+      }
+      
+      throw error;
+    }
   }
 
   async postWithRetry(content, maxRetries = 3) {
