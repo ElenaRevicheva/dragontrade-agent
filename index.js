@@ -1948,12 +1948,56 @@ class AuthenticTwitterClient {
         } catch (error) {
           console.error(`❌ [THREAD ${position}/${chunks.length}] Failed to post:`, error.message);
           
-          // If we fail mid-thread, we have a partial thread problem
-          if (postedTweets.length > 0) {
+          // Check if it's a rate limit error
+          const isRateLimit = error.code === 429 || error.message.includes('429') || error.message.includes('rate limit');
+          
+          if (isRateLimit) {
+            console.error('⏰ [THREAD] Hit Twitter rate limit!');
+            
+            // If we haven't posted any tweets yet, we can safely abort
+            if (postedTweets.length === 0) {
+              console.error('⏰ [THREAD] Aborting thread - will retry later');
+              
+              // Mark as rate limited
+              if (this.rateLimitTracker) {
+                this.rateLimitTracker.isPaused = true;
+                this.rateLimitTracker.pauseUntil = Date.now() + (15 * 60 * 1000); // 15 min pause
+                console.error('⏰ [RATE LIMIT] Pausing bot for 15 minutes');
+              }
+              
+              // Return null instead of throwing (graceful degradation)
+              return null;
+            }
+            
+            // If we have partial thread, this is a problem
             console.error(`⚠️ [THREAD] Partial thread posted (${postedTweets.length}/${chunks.length})`);
             console.error(`⚠️ [THREAD] Posted tweet IDs:`, postedTweets.map(t => t.id));
+            console.error('⏰ [THREAD] Cannot complete thread due to rate limit');
+            
+            // Pause bot
+            if (this.rateLimitTracker) {
+              this.rateLimitTracker.isPaused = true;
+              this.rateLimitTracker.pauseUntil = Date.now() + (15 * 60 * 1000);
+              console.error('⏰ [RATE LIMIT] Pausing bot for 15 minutes');
+            }
+            
+            // Return partial thread info (don't crash)
+            return {
+              data: {
+                id: postedTweets[0].id,
+                text: postedTweets[0].content
+              },
+              meta: {
+                isThread: true,
+                isPartial: true,
+                threadLength: chunks.length,
+                postedLength: postedTweets.length,
+                allTweetIds: postedTweets.map(t => t.id)
+              }
+            };
           }
           
+          // For non-rate-limit errors, throw
           throw new Error(`Thread posting failed at tweet ${position}/${chunks.length}: ${error.message}`);
         }
       }
@@ -1978,13 +2022,32 @@ class AuthenticTwitterClient {
     } catch (error) {
       console.error('❌ [THREAD] Thread posting failed:', error.message);
       
-      // Track failure
+      // Check if it's a rate limit error
+      const isRateLimit = error.code === 429 || error.message.includes('429') || error.message.includes('rate limit');
+      
+      if (isRateLimit) {
+        console.error('⏰ [THREAD] Rate limit error - pausing bot');
+        
+        if (this.rateLimitTracker) {
+          this.rateLimitTracker.isPaused = true;
+          this.rateLimitTracker.pauseUntil = Date.now() + (15 * 60 * 1000); // 15 min
+          this.rateLimitTracker.consecutiveFailures++;
+          this.rateLimitTracker.lastFailureTime = Date.now();
+        }
+        
+        // Return null instead of throwing (don't crash bot)
+        return null;
+      }
+      
+      // Track failure for non-rate-limit errors
       if (this.rateLimitTracker) {
         this.rateLimitTracker.consecutiveFailures++;
         this.rateLimitTracker.lastFailureTime = Date.now();
       }
       
-      throw error;
+      // For other errors, return null (don't crash)
+      console.error('⚠️ [THREAD] Returning null to prevent bot crash');
+      return null;
     }
   }
 
