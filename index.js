@@ -17,6 +17,7 @@ import postLogger from './post-logger.js';
 import { getPostTypeFromCyclePosition, getExchangeFromContent } from './post-tracking-helper.js';
 import { generateAIdeazzContent } from './aideazz-content-generator.js';
 import { prepareThread, validateThreadChunks, needsThreading } from './twitter-thread-helper.js';
+import { hasRecentVerification, getCachedUserData, saveVerification } from './twitter-verification-cache.js';
 
 dotenv.config();
 
@@ -1414,15 +1415,40 @@ class AuthenticTwitterClient {
     }
     
     try {
-      console.log('🎯 Testing authentic connection...');
-      const user = await this.client.v2.me();
+      // 🔓 Check if we have a recent verification (saves API calls!)
+      const hasCache = await hasRecentVerification();
       
-      console.log('✅ 100% AUTHENTIC ALGOM WITH EDUCATION ACTIVATED!');
-      console.log('🐉 Connected as:', user.data.username);
-      console.log('👑 Display name:', user.data.name);
-      console.log('🏆 Mission: 100% authentic crypto data + Quality reposts + Education');
-      console.log('💎 BASIC PLAN MODE: Full rate limit potential unlocked!');
-      console.log('🔗 COINGECKO MCP: Real-time API integration active!');
+      let user;
+      if (hasCache) {
+        // Use cached data - no API call needed!
+        user = await getCachedUserData();
+        if (user) {
+          console.log('✅ 100% AUTHENTIC ALGOM WITH EDUCATION ACTIVATED!');
+          console.log('🐉 Connected as:', user.username, '(cached)');
+          console.log('👑 Display name:', user.name);
+          console.log('🏆 Mission: 100% authentic crypto data + Quality reposts + Education');
+          console.log('💎 BASIC PLAN MODE: Full rate limit potential unlocked!');
+          console.log('🔗 COINGECKO MCP: Real-time API integration active!');
+          console.log('💾 Skipped API verification (using cache) - saves rate limit!');
+        }
+      }
+      
+      // If no cache or cache read failed, verify with Twitter API
+      if (!user) {
+        console.log('🎯 Testing authentic connection with Twitter API...');
+        const response = await this.client.v2.me();
+        user = response.data;
+        
+        // Save to cache for next 23 hours
+        await saveVerification(user);
+        
+        console.log('✅ 100% AUTHENTIC ALGOM WITH EDUCATION ACTIVATED!');
+        console.log('🐉 Connected as:', user.username);
+        console.log('👑 Display name:', user.name);
+        console.log('🏆 Mission: 100% authentic crypto data + Quality reposts + Education');
+        console.log('💎 BASIC PLAN MODE: Full rate limit potential unlocked!');
+        console.log('🔗 COINGECKO MCP: Real-time API integration active!');
+      }
       
       this.isActive = true;
       console.log('🚀 Starting authentic posting...');

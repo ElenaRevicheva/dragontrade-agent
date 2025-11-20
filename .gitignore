@@ -9,3 +9,4 @@ echo "node_modules/
 secrets.json
 character-with-secrets.json" > .gitignore
 node_modules
+.twitter-verification-cache.json
