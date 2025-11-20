@@ -526,20 +526,40 @@ class ProfessionalPaperTradingBot {
       }
       
       // EXECUTE ENTRY if signal found and minimum confirmations met
-      if (entrySignal && side && confirmations.length >= 3) {
+      // RELAXED: Changed from 3 to 2 confirmations for more trades
+      if (entrySignal && side && confirmations.length >= 2) {
         console.log(`\n🎯 ${side} ENTRY SIGNAL: ${entrySignal}`);
-        console.log(`\n📋 CONFIRMATIONS:`);
+        console.log(`\n📋 CONFIRMATIONS (${confirmations.length}):`);
         confirmations.forEach(c => console.log(`   ${c}`));
         
         this.openPosition(side, entrySignal, confirmations);
       } else {
-        console.log(`\n⏳ No entry signal`);
-        if (confirmations.length > 0 || bullishScore > 0) {
-          const allPartials = [...(bullishScore > 0 ? bullishConfirmations : [])];
-          if (allPartials.length > 0) {
-            console.log(`   Partial confirmations (${allPartials.length}/3+):`);
-            allPartials.forEach(c => console.log(`   ${c}`));
+        // ENHANCED DIAGNOSTIC LOGGING
+        console.log(`\n⏳ No entry signal (need 2+ confirmations)`);
+        
+        // Show what we have
+        if (bullishScore > 0 && bullishConfirmations.length > 0) {
+          console.log(`\n📊 Bullish signals found (${bullishConfirmations.length}/2+):`);
+          bullishConfirmations.forEach(c => console.log(`   ${c}`));
+        }
+        
+        // Show current MA positions
+        const fastSlowSpread = ((fastMA - slowMA) / slowMA) * 100;
+        const priceVsTrend = ((this.currentPrice - trendMA) / trendMA) * 100;
+        console.log(`\n📈 Current Market State:`);
+        console.log(`   Fast vs Slow MA: ${fastSlowSpread > 0 ? '+' : ''}${fastSlowSpread.toFixed(2)}% ${fastMA > slowMA ? '(Bullish)' : '(Bearish)'}`);
+        console.log(`   Price vs Trend MA: ${priceVsTrend > 0 ? '+' : ''}${priceVsTrend.toFixed(2)}% ${this.currentPrice > trendMA ? '(Above)' : '(Below)'}`);
+        console.log(`   RSI: ${rsi.toFixed(1)} ${rsi < 35 ? '(OVERSOLD!)' : rsi > 65 ? '(OVERBOUGHT!)' : '(Neutral)'}`);
+        console.log(`   Volume: ${(currentVolume / avgVolume).toFixed(2)}x average ${hasVolumeConfirmation ? '✅' : '❌'}`);
+        console.log(`   Overall Trend: ${trend}`);
+        
+        // Show what's needed
+        if (fastMA > slowMA) {
+          if (bullishConfirmations.length === 1) {
+            console.log(`\n💡 Need 1 more confirmation for LONG entry`);
           }
+        } else if (fastMA < slowMA) {
+          console.log(`\n💡 In bearish setup - watching for SHORT opportunity`);
         }
       }
     }
