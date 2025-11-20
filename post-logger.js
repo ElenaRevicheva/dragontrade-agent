@@ -25,6 +25,20 @@ class PostLogger {
       
       const contentPreview = content.substring(0, 100);
       
+      // Map content types from CONTENT_CYCLE to database types
+      const typeMap = {
+        'paper_trading': 'paper_trading_report',
+        'aideazz': 'aideazz_marketing',
+        'educational': 'educational_content'
+      };
+      const dbPostType = typeMap[postType] || postType;
+      
+      // Extract cycle position and thread data from metadata
+      const cyclePosition = metadata.cyclePosition || null;
+      const isThread = metadata.isThread || false;
+      const threadLength = metadata.threadLength || null;
+      const threadTweetIds = metadata.allTweetIds || null;
+      
       await client.query(`
         INSERT INTO post_log (
           post_number, 
@@ -34,20 +48,28 @@ class PostLogger {
           full_content, 
           posted_at, 
           success, 
-          metadata
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), TRUE, $6)
+          metadata,
+          cycle_position,
+          is_thread,
+          thread_length,
+          thread_tweet_ids
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), TRUE, $6, $7, $8, $9, $10)
       `, [
         postNumber,
-        postType,
+        dbPostType,  // Use mapped database type
         exchange,
         contentPreview,
         content,
-        JSON.stringify(metadata)
+        JSON.stringify(metadata),
+        cyclePosition,
+        isThread,
+        threadLength,
+        threadTweetIds
       ]);
       
       await client.end();
       
-      console.log(`✅ [POST LOG] Logged post #${postNumber} (${postType}${exchange ? ` - ${exchange}` : ''})`);
+      console.log(`✅ [POST LOG] Logged post #${postNumber} (${dbPostType}${exchange ? ` - ${exchange}` : ''})`);
     } catch (error) {
       console.error(`❌ [POST LOG] Failed to log post:`, error.message);
       try {

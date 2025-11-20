@@ -228,7 +228,7 @@ app.get('/', async (req, res) => {
     <div class="container">
         <div class="header">
             <h1>📊 ALGOM Post Tracking Dashboard</h1>
-            <p>Real-time statistics from your paper trading bot</p>
+            <p>Real-time statistics from your Twitter bot - 20-Post Content Cycle (30% Trading / 30% AIdeazz / 40% Education)</p>
             <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Data</button>
         </div>
         
@@ -260,15 +260,21 @@ app.get('/', async (req, res) => {
                     </div>
                     
                     <div class="stat-card">
-                        <h3>Paper Trading</h3>
+                        <h3>📊 Paper Trading</h3>
                         <div class="value">\${data.summary.paperTradingPosts}</div>
-                        <div class="label">\${data.summary.paperTradingPercent}% of total</div>
+                        <div class="label">\${data.summary.paperTradingPercent}% (Target: 30%)</div>
                     </div>
                     
                     <div class="stat-card">
-                        <h3>Educational</h3>
+                        <h3>🚀 AIdeazz Marketing</h3>
+                        <div class="value">\${data.summary.aideazzPosts}</div>
+                        <div class="label">\${data.summary.aideazzPercent}% (Target: 30%)</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <h3>📚 Educational</h3>
                         <div class="value">\${data.summary.educationalPosts}</div>
-                        <div class="label">\${data.summary.educationalPercent}% of total</div>
+                        <div class="label">\${data.summary.educationalPercent}% (Target: 40%)</div>
                     </div>
                     
                     <div class="stat-card">
@@ -276,24 +282,46 @@ app.get('/', async (req, res) => {
                         <div class="value">\${data.summary.todayPosts}</div>
                         <div class="label">Last 24 hours</div>
                     </div>
+                    
+                    <div class="stat-card">
+                        <h3>🧵 Thread Usage</h3>
+                        <div class="value">\${data.threads.totalThreads}</div>
+                        <div class="label">\${data.threads.threadPercentage}% threaded</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <h3>🎯 Cycle Position</h3>
+                        <div class="value">\${data.cycle.currentPosition || '?'}/20</div>
+                        <div class="label">\${data.cycle.lastPostType ? data.cycle.lastPostType.replace('_', ' ') : 'Not started'}</div>
+                    </div>
                 </div>
                 
                 <div class="section">
-                    <h2>📈 Content Balance</h2>
+                    <h2>📈 Content Balance (30/30/40 Target)</h2>
                     <div style="margin: 20px 0;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span><span class="emoji">📊</span> Paper Trading: \${data.summary.paperTradingPercent}%</span>
-                            <span><span class="emoji">📚</span> Educational: \${data.summary.educationalPercent}%</span>
+                            <span><span class="emoji">📊</span> Paper Trading: \${data.summary.paperTradingPercent}% (Target: 30%)</span>
+                            <span><span class="emoji">🚀</span> AIdeazz: \${data.summary.aideazzPercent}% (Target: 30%)</span>
+                            <span><span class="emoji">📚</span> Educational: \${data.summary.educationalPercent}% (Target: 40%)</span>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: \${data.summary.paperTradingPercent}%">
+                        <!-- Multi-segment progress bar -->
+                        <div style="display: flex; width: 100%; height: 40px; border-radius: 15px; overflow: hidden; margin: 10px 0;">
+                            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: \${data.summary.paperTradingPercent}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
                                 \${data.summary.paperTradingPercent}%
+                            </div>
+                            <div style="background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%); width: \${data.summary.aideazzPercent}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
+                                \${data.summary.aideazzPercent}%
+                            </div>
+                            <div style="background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%); width: \${data.summary.educationalPercent}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
+                                \${data.summary.educationalPercent}%
                             </div>
                         </div>
                         <p style="margin-top: 10px; color: #666;">
-                            \${data.summary.paperTradingPercent >= 28 && data.summary.paperTradingPercent <= 32 
+                            \${Math.abs(data.summary.paperTradingPercent - 30) <= 2 && 
+                              Math.abs(data.summary.aideazzPercent - 30) <= 2 && 
+                              Math.abs(data.summary.educationalPercent - 40) <= 2
                                 ? '✅ Perfect balance!' 
-                                : '⚠️ Target: 30% trading / 70% education'}
+                                : '⚠️ Target: 30% trading / 30% AIdeazz / 40% education'}
                         </p>
                     </div>
                 </div>
@@ -305,11 +333,13 @@ app.get('/', async (req, res) => {
                             <tr>
                                 <th>Date</th>
                                 <th>Total</th>
-                                <th>Paper Trading</th>
+                                <th>📊 Paper Trading</th>
                                 <th>🟣 Bybit</th>
                                 <th>🟡 Binance</th>
                                 <th>⚖️ Both</th>
+                                <th>🚀 AIdeazz</th>
                                 <th>📚 Educational</th>
+                                <th>🧵 Threads</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -317,11 +347,13 @@ app.get('/', async (req, res) => {
                                 <tr>
                                     <td>\${new Date(day.post_date).toLocaleDateString()}</td>
                                     <td><strong>\${day.total_posts}</strong></td>
-                                    <td>\${day.paper_trading_posts}</td>
-                                    <td>\${day.bybit_posts}</td>
-                                    <td>\${day.binance_posts}</td>
-                                    <td>\${day.comparison_posts}</td>
-                                    <td>\${day.educational_posts}</td>
+                                    <td>\${day.paper_trading_posts || 0}</td>
+                                    <td>\${day.bybit_posts || 0}</td>
+                                    <td>\${day.binance_posts || 0}</td>
+                                    <td>\${day.comparison_posts || 0}</td>
+                                    <td>\${day.aideazz_posts || 0}</td>
+                                    <td>\${day.educational_posts || 0}</td>
+                                    <td>\${day.threaded_posts || 0} (\${day.avg_thread_length ? day.avg_thread_length.toFixed(1) : 'N/A'} avg)</td>
                                 </tr>
                             \`).join('')}
                         </tbody>
@@ -336,6 +368,7 @@ app.get('/', async (req, res) => {
                                 <th>Post #</th>
                                 <th>Exchange</th>
                                 <th>Preview</th>
+                                <th>Format</th>
                                 <th>Posted</th>
                             </tr>
                         </thead>
@@ -344,11 +377,13 @@ app.get('/', async (req, res) => {
                                 const exchangeBadge = post.exchange === 'bybit' ? 'badge-bybit' : 
                                                      post.exchange === 'binance' ? 'badge-binance' : 'badge-both';
                                 const exchangeText = post.exchange ? post.exchange.toUpperCase() : 'UNKNOWN';
+                                const threadInfo = post.is_thread ? \`🧵 Thread (\${post.thread_length})\` : '📝 Single';
                                 return \`
                                     <tr>
                                         <td><strong>#\${post.post_number}</strong></td>
                                         <td><span class="badge \${exchangeBadge}">\${exchangeText}</span></td>
                                         <td>\${post.content_preview}...</td>
+                                        <td>\${threadInfo}</td>
                                         <td>\${new Date(post.posted_at).toLocaleString()}</td>
                                     </tr>
                                 \`;
@@ -359,6 +394,35 @@ app.get('/', async (req, res) => {
                 </div>
                 
                 <div class="section">
+                    <h2>🚀 Recent AIdeazz Marketing Posts</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Post #</th>
+                                <th>Theme</th>
+                                <th>Preview</th>
+                                <th>Posted</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            \${data.recentAideazz.map(post => {
+                                const metadata = typeof post.metadata === 'string' ? JSON.parse(post.metadata) : post.metadata;
+                                const theme = metadata?.theme || 'Unknown';
+                                return \`
+                                    <tr>
+                                        <td><strong>#\${post.post_number}</strong></td>
+                                        <td><span class="badge" style="background: #fff0f5; color: #e91e63;">\${theme.replace(/_/g, ' ').toUpperCase()}</span></td>
+                                        <td>\${post.content_preview}...</td>
+                                        <td>\${new Date(post.posted_at).toLocaleString()}</td>
+                                    </tr>
+                                \`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    \${data.recentAideazz.length === 0 ? '<p style="text-align: center; color: #999; padding: 20px;">No AIdeazz posts yet. Tracking starts from next post!</p>' : ''}
+                </div>
+                
+                <div class="section">
                     <h2>📊 Post Type Distribution</h2>
                     <table>
                         <thead>
@@ -366,6 +430,7 @@ app.get('/', async (req, res) => {
                                 <th>Post Type</th>
                                 <th>Count</th>
                                 <th>Percentage</th>
+                                <th>🧵 Threads</th>
                                 <th>Last Posted</th>
                             </tr>
                         </thead>
@@ -381,12 +446,47 @@ app.get('/', async (req, res) => {
                                             </div>
                                         </div>
                                     </td>
+                                    <td>\${type.thread_count || 0}</td>
                                     <td>\${new Date(type.last_posted).toLocaleString()}</td>
                                 </tr>
                             \`).join('')}
                         </tbody>
                     </table>
                 </div>
+                
+                \${data.exchangePerformance && data.exchangePerformance.length > 0 ? \`
+                <div class="section">
+                    <h2>💹 Exchange Performance (Paper Trading)</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Exchange</th>
+                                <th>Trades</th>
+                                <th>Win Rate</th>
+                                <th>Total P&L</th>
+                                <th>ROI</th>
+                                <th>Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            \${data.exchangePerformance.map(perf => \`
+                                <tr>
+                                    <td><strong>\${perf.exchange.toUpperCase()}</strong></td>
+                                    <td>\${perf.totalTrades || 0}</td>
+                                    <td>\${perf.winRate ? perf.winRate.toFixed(1) : '0.0'}%</td>
+                                    <td style="color: \${(perf.totalProfitLoss || 0) >= 0 ? 'green' : 'red'}; font-weight: bold;">
+                                        \${(perf.totalProfitLoss || 0) >= 0 ? '+' : ''}\${(perf.totalProfitLoss || 0).toFixed(2)}%
+                                    </td>
+                                    <td style="color: \${(perf.roi || 0) >= 0 ? 'green' : 'red'}; font-weight: bold;">
+                                        \${(perf.roi || 0) >= 0 ? '+' : ''}\${(perf.roi || 0).toFixed(2)}%
+                                    </td>
+                                    <td>\${perf.lastUpdated ? new Date(perf.lastUpdated).toLocaleString() : 'N/A'}</td>
+                                </tr>
+                            \`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                \` : ''}
             \`;
             
             document.getElementById('dashboard').innerHTML = html;
@@ -395,6 +495,7 @@ app.get('/', async (req, res) => {
         function formatTypeName(type) {
             const emoji = {
                 'paper_trading_report': '📊',
+                'aideazz_marketing': '🚀',
                 'educational_content': '📚',
                 'risk_management_tip': '💡',
                 'market_psychology_insight': '🧠',
@@ -432,37 +533,66 @@ app.get('/api/stats', async (req, res) => {
   try {
     await client.connect();
     
-    // Get summary stats
-    const summaryResult = await client.query(`
-      SELECT 
-        COUNT(*) as total_posts,
-        COUNT(CASE WHEN post_type = 'paper_trading_report' THEN 1 END) as paper_trading_posts,
-        COUNT(CASE WHEN post_type IN ('educational_content', 'risk_management_tip', 'market_psychology_insight', 'scam_awareness', 'personalized_lesson') THEN 1 END) as educational_posts,
-        COUNT(CASE WHEN posted_at > NOW() - INTERVAL '24 hours' THEN 1 END) as today_posts
+    // Get content balance (uses new view with 30/30/40 targets)
+    const balanceResult = await client.query('SELECT * FROM content_balance');
+    const balance = balanceResult.rows[0] || {
+      total_posts: 0,
+      paper_trading_count: 0,
+      aideazz_count: 0,
+      educational_count: 0,
+      paper_trading_percent: 0,
+      aideazz_percent: 0,
+      educational_percent: 0,
+      target_paper_trading: 30,
+      target_aideazz: 30,
+      target_educational: 40
+    };
+    
+    // Get today's posts count
+    const todayResult = await client.query(`
+      SELECT COUNT(*) as today_posts
       FROM post_log
-      WHERE success = TRUE
+      WHERE posted_at > NOW() - INTERVAL '24 hours' AND success = TRUE
     `);
+    const todayPosts = parseInt(todayResult.rows[0].today_posts);
     
-    const summary = summaryResult.rows[0];
-    summary.paper_trading_percent = summary.total_posts > 0 
-      ? Math.round((summary.paper_trading_posts / summary.total_posts) * 100) 
-      : 0;
-    summary.educational_percent = summary.total_posts > 0
-      ? Math.round((summary.educational_posts / summary.total_posts) * 100)
-      : 0;
-    
-    // Get daily stats
+    // Get daily stats (now includes AIdeazz)
     const dailyResult = await client.query(`
       SELECT * FROM daily_post_stats
       ORDER BY post_date DESC
       LIMIT 7
     `);
     
-    // Get post type distribution
+    // Get post type distribution (now includes thread metrics)
     const distributionResult = await client.query(`
       SELECT * FROM post_type_distribution
       ORDER BY count DESC
     `);
+    
+    // Get thread analytics
+    const threadResult = await client.query('SELECT * FROM thread_analytics');
+    const threadAnalytics = threadResult.rows[0] || {
+      total_threads: 0,
+      single_tweets: 0,
+      avg_thread_length: null,
+      max_thread_length: null,
+      min_thread_length: null,
+      thread_percentage: 0
+    };
+    
+    // Get cycle progress (shows position 1-20)
+    const cycleResult = await client.query(`
+      SELECT 
+        cycle_position,
+        post_type,
+        MAX(posted_at) as last_posted_at
+      FROM post_log
+      WHERE cycle_position IS NOT NULL AND success = TRUE
+      GROUP BY cycle_position, post_type
+      ORDER BY MAX(posted_at) DESC
+      LIMIT 1
+    `);
+    const currentCycle = cycleResult.rows[0] || null;
     
     // Get recent paper trading posts
     const recentResult = await client.query(`
@@ -470,27 +600,73 @@ app.get('/api/stats', async (req, res) => {
         post_number,
         exchange,
         content_preview,
-        posted_at
+        posted_at,
+        is_thread,
+        thread_length
       FROM post_log
       WHERE post_type = 'paper_trading_report' AND success = TRUE
       ORDER BY posted_at DESC
       LIMIT 10
     `);
     
+    // Get recent AIdeazz posts
+    const aideazzResult = await client.query(`
+      SELECT 
+        post_number,
+        content_preview,
+        posted_at,
+        metadata
+      FROM post_log
+      WHERE post_type = 'aideazz_marketing' AND success = TRUE
+      ORDER BY posted_at DESC
+      LIMIT 5
+    `);
+    
+    // Get performance metrics per exchange (from trading_stats table)
+    const performanceResult = await client.query(`
+      SELECT 
+        exchange,
+        data
+      FROM trading_stats
+      ORDER BY updated_at DESC
+    `);
+    
     await client.end();
     
     res.json({
       summary: {
-        totalPosts: parseInt(summary.total_posts),
-        paperTradingPosts: parseInt(summary.paper_trading_posts),
-        educationalPosts: parseInt(summary.educational_posts),
-        todayPosts: parseInt(summary.today_posts),
-        paperTradingPercent: summary.paper_trading_percent,
-        educationalPercent: summary.educational_percent
+        totalPosts: parseInt(balance.total_posts),
+        paperTradingPosts: parseInt(balance.paper_trading_count),
+        aideazzPosts: parseInt(balance.aideazz_count),
+        educationalPosts: parseInt(balance.educational_count),
+        todayPosts: todayPosts,
+        paperTradingPercent: parseFloat(balance.paper_trading_percent),
+        aideazzPercent: parseFloat(balance.aideazz_percent),
+        educationalPercent: parseFloat(balance.educational_percent),
+        targetPaperTrading: 30,
+        targetAideazz: 30,
+        targetEducational: 40
+      },
+      cycle: {
+        currentPosition: currentCycle?.cycle_position || null,
+        lastPostType: currentCycle?.post_type || null,
+        lastPostedAt: currentCycle?.last_posted_at || null
+      },
+      threads: {
+        totalThreads: parseInt(threadAnalytics.total_threads),
+        singleTweets: parseInt(threadAnalytics.single_tweets),
+        avgThreadLength: threadAnalytics.avg_thread_length ? parseFloat(threadAnalytics.avg_thread_length).toFixed(1) : null,
+        maxThreadLength: threadAnalytics.max_thread_length,
+        threadPercentage: parseFloat(threadAnalytics.thread_percentage)
       },
       dailyStats: dailyResult.rows,
       postTypeDistribution: distributionResult.rows,
-      recentPaperTrading: recentResult.rows
+      recentPaperTrading: recentResult.rows,
+      recentAideazz: aideazzResult.rows,
+      exchangePerformance: performanceResult.rows.map(row => ({
+        exchange: row.exchange,
+        ...row.data
+      }))
     });
     
   } catch (error) {
