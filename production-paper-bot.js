@@ -403,26 +403,56 @@ class ProductionPaperTradingBot {
       return;
     }
     
+    // Calculate MA spread for diagnostics
+    const spread = ((shortMA - longMA) / longMA) * 100;
+    
     console.log(`\n📊 INDICATORS:`);
     console.log(`   Short MA(${this.config.strategy.shortMA}): $${shortMA.toFixed(2)}`);
     console.log(`   Long MA(${this.config.strategy.longMA}): $${longMA.toFixed(2)}`);
     console.log(`   RSI(${this.config.strategy.rsiPeriod}): ${rsi.toFixed(2)}`);
+    console.log(`   📈 MA Spread: ${spread > 0 ? '+' : ''}${spread.toFixed(2)}%`);
     
-    // BUY SIGNAL: MA Crossover + RSI confirmation
-    if (!this.position && shortMA > longMA && rsi < this.config.strategy.rsiOverbought) {
-      const prevShortMA = this.calculateMA(
+    // BUY SIGNAL: RELAXED CONDITIONS for more trades
+    if (!this.position) {
+      // Calculate previous MAs for crossover detection
+      const prevShortMA = this.candles.length > 1 ? this.calculateMA(
         this.candles.slice(0, -1).map(c => c.close),
         this.config.strategy.shortMA
-      );
-      const prevLongMA = this.calculateMA(
+      ) : shortMA;
+      const prevLongMA = this.candles.length > 1 ? this.calculateMA(
         this.candles.slice(0, -1).map(c => c.close),
         this.config.strategy.longMA
-      );
+      ) : longMA;
       
-      // Check for crossover
-      if (prevShortMA <= prevLongMA) {
-        console.log('🎯 BUY SIGNAL DETECTED: MA Crossover + RSI confirmation');
-        this.openPosition('LONG');
+      const freshCrossover = (prevShortMA <= prevLongMA) && (shortMA > longMA);
+      const strongUptrend = (shortMA > longMA) && (spread > 0.5); // 0.5% spread = strong trend
+      const oversoldBounce = (rsi < 35) && (shortMA > longMA); // RSI oversold + trend up
+      
+      // DIAGNOSTIC LOGGING
+      if (shortMA <= longMA) {
+        console.log('⏳ Waiting for bullish crossover (Short MA needs to cross above Long MA)');
+        console.log(`   Current: Short MA ${spread > 0 ? 'above' : 'BELOW'} Long MA by ${Math.abs(spread).toFixed(2)}%`);
+      } else if (rsi >= this.config.strategy.rsiOverbought) {
+        console.log('⏳ Market overbought - waiting for RSI cooldown');
+        console.log(`   RSI: ${rsi.toFixed(1)} >= ${this.config.strategy.rsiOverbought} (overbought threshold)`);
+      } else {
+        console.log('✅ Conditions analysis:');
+        console.log(`   Fresh Crossover: ${freshCrossover ? '✅ YES' : '❌ NO'} (just crossed)`);
+        console.log(`   Strong Uptrend: ${strongUptrend ? '✅ YES' : '❌ NO'} (spread > 0.5%)`);
+        console.log(`   Oversold Bounce: ${oversoldBounce ? '✅ YES' : '❌ NO'} (RSI < 35 + uptrend)`);
+      }
+      
+      // ENTER if ANY condition is met
+      if (shortMA > longMA && rsi < this.config.strategy.rsiOverbought) {
+        if (freshCrossover || strongUptrend || oversoldBounce) {
+          const reason = freshCrossover ? 'Fresh MA Crossover' : 
+                        strongUptrend ? `Strong Uptrend (${spread.toFixed(2)}% spread)` :
+                        'RSI Oversold Bounce';
+          console.log(`🎯 BUY SIGNAL DETECTED: ${reason}`);
+          console.log(`   Entry Logic: Crossover=${freshCrossover}, Trend=${strongUptrend}, Oversold=${oversoldBounce}`);
+          console.log(`   RSI: ${rsi.toFixed(1)} | Spread: ${spread.toFixed(2)}%`);
+          this.openPosition('LONG');
+        }
       }
     }
     
@@ -439,8 +469,15 @@ class ProductionPaperTradingBot {
       
       if (prevShortMA >= prevLongMA) {
         console.log('🎯 SELL SIGNAL DETECTED: MA Crossover down');
+        console.log(`   Exit: Short MA crossed below Long MA | Spread: ${spread.toFixed(2)}%`);
         this.closePosition('SIGNAL');
       }
+    }
+    
+    // Log position status
+    if (this.position) {
+      const pnl = ((this.currentPrice - this.position.entryPrice) / this.position.entryPrice) * 100;
+      console.log(`💼 POSITION ACTIVE: ${pnl > 0 ? '🟢' : '🔴'} P&L: ${pnl > 0 ? '+' : ''}${pnl.toFixed(2)}%`);
     }
   }
 

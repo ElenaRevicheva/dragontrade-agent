@@ -1,2 +1,3 @@
 web: node index.js
-worker: node production-paper-bot.js
+bybit-bot: EXCHANGE=bybit node production-paper-bot.js
+binance-bot: EXCHANGE=binance node production-paper-bot.js
