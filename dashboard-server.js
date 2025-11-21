@@ -353,7 +353,7 @@ app.get('/', async (req, res) => {
                                     <td>\${day.comparison_posts || 0}</td>
                                     <td>\${day.aideazz_posts || 0}</td>
                                     <td>\${day.educational_posts || 0}</td>
-                                    <td>\${day.threaded_posts || 0} (\${day.avg_thread_length ? day.avg_thread_length.toFixed(1) : 'N/A'} avg)</td>
+                                    <td>\${day.threaded_posts || 0} (\${day.avg_thread_length ? parseFloat(day.avg_thread_length).toFixed(1) : 'N/A'} avg)</td>
                                 </tr>
                             \`).join('')}
                         </tbody>
