@@ -1752,9 +1752,6 @@ class AuthenticTwitterClient {
         return null;
       }
       
-      // Oracle Cloud signature for verification
-      authenticContent += '\n\n☁️ Powered by Oracle Cloud';
-      
       console.log(`\n📝 Generated content (${authenticContent.length} chars):`);
       console.log(authenticContent);
       
