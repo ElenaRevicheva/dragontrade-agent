@@ -27,6 +27,10 @@ class MCPHealthMonitor {
   }
 
   async performHealthCheck() {
+    if (process.env.COINGECKO_USE_DIRECT_API_ONLY === '1') {
+      this.recordHealthCheck('DIRECT_API_ONLY', 'CoinGecko MCP skipped for stability');
+      return;
+    }
     const timestamp = new Date().toISOString();
     console.log(`\n🔍 [${timestamp}] Performing MCP health check...`);
     

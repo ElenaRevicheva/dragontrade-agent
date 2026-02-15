@@ -21,12 +21,24 @@ import { hasRecentVerification, getCachedUserData, saveVerification } from './tw
 
 dotenv.config();
 
+// Prevent silent death: log uncaught errors so PM2/oracle-health can see cause before restart
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaughtException:', err.message);
+  console.error(err.stack);
+  setTimeout(() => process.exit(1), 1000);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] unhandledRejection:', reason);
+  if (reason && typeof reason === 'object' && reason.stack) console.error(reason.stack);
+  setTimeout(() => process.exit(1), 1000);
+});
+
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
-process.env.POST_INTERVAL_MIN = '3';
-process.env.POST_INTERVAL_MAX = '10';
-process.env.TWITTER_POLL_INTERVAL = '120';
+process.env.POST_INTERVAL_MIN = process.env.POST_INTERVAL_MIN || '3';
+process.env.POST_INTERVAL_MAX = process.env.POST_INTERVAL_MAX || '10';
+process.env.TWITTER_POLL_INTERVAL = process.env.TWITTER_POLL_INTERVAL || '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
 
@@ -121,8 +133,10 @@ class CryptoEducationEngine {
       }
     }
 
-    // Fallback to MCP if direct API fails
-    if (!this.coinGeckoDirectInitialized && !this.coinGeckoInitialized) {
+    // Fallback to MCP only if direct API failed and we are not in direct-only mode.
+    // Skipping MCP when COINGECKO_USE_DIRECT_API_ONLY=1 avoids crash-loop from mcp.api.coingecko.com (500/SSE errors).
+    const skipCoinGeckoMCP = process.env.COINGECKO_USE_DIRECT_API_ONLY === '1' || this.coinGeckoDirectInitialized;
+    if (!skipCoinGeckoMCP && !this.coinGeckoDirectInitialized && !this.coinGeckoInitialized) {
       try {
         console.log('🔗 [COINGECKO MCP] Attempting to initialize MCP client as fallback...');
         
@@ -156,6 +170,9 @@ class CryptoEducationEngine {
       } catch (error) {
         console.log('⚠️ CoinGecko MCP fallback mode activated:', error.message);
       }
+    }
+    if (skipCoinGeckoMCP && this.coinGeckoDirectInitialized) {
+      console.log('🔗 [COINGECKO] Using Direct API only (MCP skipped for stability)');
     }
 
     if (!this.azTokenInitialized) {
