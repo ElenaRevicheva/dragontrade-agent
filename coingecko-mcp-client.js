@@ -18,6 +18,16 @@ class CoinGeckoMCPClient {
   }
 
   async initialize() {
+    // In direct-API-only mode, never connect to CoinGecko MCP.
+    // This avoids spawning the mcp-remote subprocess that has been returning 500/SSE errors
+    // and causing crash loops on Oracle.
+    if (process.env.COINGECKO_USE_DIRECT_API_ONLY === '1') {
+      console.log('🔌 [COINGECKO MCP] Skipped initialization (COINGECKO_USE_DIRECT_API_ONLY=1)');
+      this.isConnected = false;
+      this.tools = [];
+      return false;
+    }
+
     try {
       console.log('🔗 [COINGECKO MCP] Initializing CoinGecko MCP client with enhanced timeout handling...');
       
