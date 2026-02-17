@@ -344,6 +344,9 @@ class CryptoEducationEngine {
 
   // Real CoinGecko API data methods with enhanced error handling and rate limiting
   async getRealCoinGeckoData() {
+    if (process.env.COINGECKO_USE_DIRECT_API_ONLY === '1' && !this.coinGeckoDirectInitialized) {
+      return null;
+    }
     await this.initializeMCP();
     
     // Rate limiting check to prevent overwhelming the API server
@@ -452,7 +455,7 @@ class CryptoEducationEngine {
 
   // MCP fallback method
   async getDataFromMCP() {
-    if (!this.coinGeckoInitialized) {
+    if (process.env.COINGECKO_USE_DIRECT_API_ONLY === '1' || !this.coinGeckoInitialized) {
       return null;
     }
 
