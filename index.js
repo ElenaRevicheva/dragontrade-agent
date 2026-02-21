@@ -42,6 +42,9 @@ process.env.TWITTER_POLL_INTERVAL = process.env.TWITTER_POLL_INTERVAL || '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
 
+// When Twitter returns 429, pause this many minutes before retrying (default 60; was 15)
+const RATE_LIMIT_PAUSE_MS = (parseInt(process.env.RATE_LIMIT_PAUSE_MINUTES, 10) || 60) * 60 * 1000;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -1552,6 +1555,9 @@ class AuthenticTwitterClient {
 
   async checkForQualityReposts() {
     try {
+      if (process.env.DISABLE_POSTING === '1' || process.env.DISABLE_POSTING === 'true') {
+        return;
+      }
       console.log('🔍 [REPOST] Checking timeline for quality content...');
       
       // Check cooldown first
@@ -1693,6 +1699,10 @@ class AuthenticTwitterClient {
 
   async createAuthenticPost() {
     try {
+      if (process.env.DISABLE_POSTING === '1' || process.env.DISABLE_POSTING === 'true') {
+        console.log('⏸️ [DISABLE_POSTING] Posting disabled - skipping (bot stays online)');
+        return null;
+      }
       this.postCount++;
       console.log(`\n🎯 [Post #${this.postCount}] Starting authentic content generation...`);
       
@@ -1877,10 +1887,10 @@ class AuthenticTwitterClient {
     
     // Check for too many consecutive failures - trigger pause (Basic plan optimized)
     if (this.rateLimitTracker.consecutiveFailures >= 10) {
-      // Pause for 15 minutes after 10 consecutive failures (much shorter for Basic plan)
       this.rateLimitTracker.isPaused = true;
-      this.rateLimitTracker.pauseUntil = now + (15 * 60 * 1000); // 15 minutes
-      console.log(`🚫 [RATE LIMIT] 10+ consecutive failures detected, pausing bot for 15 minutes (Basic plan mode)`);
+      this.rateLimitTracker.pauseUntil = now + RATE_LIMIT_PAUSE_MS;
+      const pauseMin = Math.round(RATE_LIMIT_PAUSE_MS / 60000);
+      console.log(`🚫 [RATE LIMIT] 10+ consecutive failures detected, pausing bot for ${pauseMin} minutes`);
       return false;
     }
     
@@ -2004,11 +2014,11 @@ class AuthenticTwitterClient {
             if (postedTweets.length === 0) {
               console.error('⏰ [THREAD] Aborting thread - will retry later');
               
-              // Mark as rate limited
               if (this.rateLimitTracker) {
                 this.rateLimitTracker.isPaused = true;
-                this.rateLimitTracker.pauseUntil = Date.now() + (15 * 60 * 1000); // 15 min pause
-                console.error('⏰ [RATE LIMIT] Pausing bot for 15 minutes');
+                this.rateLimitTracker.pauseUntil = Date.now() + RATE_LIMIT_PAUSE_MS;
+                const pauseMin = Math.round(RATE_LIMIT_PAUSE_MS / 60000);
+                console.error(`⏰ [RATE LIMIT] Pausing bot for ${pauseMin} minutes`);
               }
               
               // Return null instead of throwing (graceful degradation)
@@ -2020,11 +2030,11 @@ class AuthenticTwitterClient {
             console.error(`⚠️ [THREAD] Posted tweet IDs:`, postedTweets.map(t => t.id));
             console.error('⏰ [THREAD] Cannot complete thread due to rate limit');
             
-            // Pause bot
             if (this.rateLimitTracker) {
               this.rateLimitTracker.isPaused = true;
-              this.rateLimitTracker.pauseUntil = Date.now() + (15 * 60 * 1000);
-              console.error('⏰ [RATE LIMIT] Pausing bot for 15 minutes');
+              this.rateLimitTracker.pauseUntil = Date.now() + RATE_LIMIT_PAUSE_MS;
+              const pauseMin = Math.round(RATE_LIMIT_PAUSE_MS / 60000);
+              console.error(`⏰ [RATE LIMIT] Pausing bot for ${pauseMin} minutes`);
             }
             
             // Return partial thread info (don't crash)
@@ -2076,7 +2086,7 @@ class AuthenticTwitterClient {
         
         if (this.rateLimitTracker) {
           this.rateLimitTracker.isPaused = true;
-          this.rateLimitTracker.pauseUntil = Date.now() + (15 * 60 * 1000); // 15 min
+          this.rateLimitTracker.pauseUntil = Date.now() + RATE_LIMIT_PAUSE_MS;
           this.rateLimitTracker.consecutiveFailures++;
           this.rateLimitTracker.lastFailureTime = Date.now();
         }
