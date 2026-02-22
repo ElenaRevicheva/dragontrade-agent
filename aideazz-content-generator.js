@@ -116,7 +116,12 @@ const CONTENT_PILLARS = {
       'Why I chose emotional intelligence as my moat',
       'Daily progress: wins AND struggles (honest)',
       'Code snippets and behind-the-scenes process',
-      'Real metrics and traction numbers'
+      'Real metrics and traction numbers',
+      '9 production AI systems deployed in 10 months: Behind the numbers',
+      'Oracle Cloud 24/7: What it takes to run LLM systems in production',
+      'Sub-$1/month inference via Claude + Groq model routing',
+      'Polkadot Blockchain Academy graduate: Building at the intersection of AI and Web3',
+      'From architecture to deployment: End-to-end LLM orchestration pipelines'
     ]
   },
   ai_human_collaboration: {
@@ -127,7 +132,11 @@ const CONTENT_PILLARS = {
       'Solo founder playbook: AI stack breakdown',
       'Vibe coding philosophy: intuition + AI tools + speed',
       'Capital efficiency: $15K for 6 products (98% cost reduction)',
-      'AI as co-founder, not replacement'
+      'AI as co-founder, not replacement',
+      'LLM orchestration: When to route Claude vs Groq (and why it matters)',
+      'LangChain, Replicate, Luma Labs: Stack that ships',
+      '9 products, one founder: How AI changes the execution math',
+      'Cursor-centric workflows: Structured testing, refactoring, deploy cycles'
     ]
   },
   emotional_ai: {
@@ -138,7 +147,9 @@ const CONTENT_PILLARS = {
       'Emotionally intelligent AI: The missing piece',
       'AIPAs that evolve with users On-The-Go',
       'Solving for 280M+ expats worldwide',
-      'Multi-platform strategy: WhatsApp, Telegram, Web'
+      'Multi-platform strategy: WhatsApp, Telegram, Web',
+      'Atuona: LLM to image to video pipeline for creative storytelling',
+      'Persistent memory in Oracle DB: AI that remembers context'
     ]
   },
   founder_journey: {
@@ -149,7 +160,13 @@ const CONTENT_PILLARS = {
       'Founder-level execution looking for world-class AI teams to join',
       'Dual-track career: Building AIdeazz + seeking AI Engineer/PM roles',
       'What I bring to AI startups: 0→1 builder, bilingual, Web3 native',
-      'Why exceptional founders also seek roles (collaboration > ego)'
+      'Why exceptional founders also seek roles (collaboration > ego)',
+      'Deputy CEO & CLO (E-Government) → Applied AI Engineer: Strategic pivot with full ownership',
+      'From board-level governance to hands-on LLM systems: What I learned',
+      'Polkadot Blockchain Academy, How-To-DAO: Learning in public, building in public',
+      '4 languages, 19 countries: Building AI for a global audience',
+      'When 0→1 execution meets emotional AI vision: What that looks like in practice',
+      'What exceptional teams and founders have in common: Collaboration over ego'
     ]
   },
   career_opportunities: {
@@ -160,7 +177,12 @@ const CONTENT_PILLARS = {
       'Open to hybrid: Full-time role + pre-seed investment (parallel execution)',
       'What I bring: Ex-CEO execution + hands-on AI engineering + emotional AI vision',
       'Built 6 products solo (98% cost reduction). Imagine with a team.',
-      'Looking for AI PM, LLM Engineer, AI Solutions Architect opportunities'
+      'Looking for AI PM, LLM Engineer, AI Solutions Architect opportunities',
+      'Applied AI Engineer profile: LLM orchestration, agent systems, persistent memory',
+      'Open to conversations with AI-first teams when alignment is right',
+      'Ex-CEO execution + LLM systems: Profile that speaks for itself',
+      '9 production systems deployed. Curious what\'s possible with the right team.',
+      'Agent orchestration, tool calling, model routing: Where my skills live'
     ]
   }
 };
@@ -171,7 +193,10 @@ const CORE_MESSAGES = [
   'AI Co-Founders: Building AI to scale solo (meta story!)',
   'Emotionally Intelligent AI Personal Assistants: Evolving with users On-The-Go',
   'Dual-track: Building AIdeazz + seeking AI Engineer/Founding Engineer roles',
-  'Former CEO/CLO → Full-stack AI Engineer (Python, TypeScript, React)'
+  'Former CEO/CLO → Full-stack AI Engineer (Python, TypeScript, React)',
+  '9 production AI systems: LLM orchestration, agent pipelines, Oracle Cloud',
+  'Applied AI Engineer: When execution meets vision',
+  'Ex-deputy CEO, Polkadot Academy grad, 4 languages: Building AI for the world'
 ];
 
 // 📝 GENERATE DRAFT (Groq - Fast & Free)
