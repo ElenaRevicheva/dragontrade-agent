@@ -1,11 +1,17 @@
-// Test Twitter API directly
+// Test Twitter API directly (uses .env - do not commit real keys)
+require('dotenv').config();
 const { TwitterApi } = require('twitter-api-v2');
 
+if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_ACCESS_TOKEN) {
+  console.log('Set TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET in .env');
+  process.exit(1);
+}
+
 const client = new TwitterApi({
-  appKey: 'i047JuaMxXdOFxW25yDCTEgNf',
-  appSecret: 'Gqyi2vyNVphLrvT9Wwdykeg7N5dEQoFH7D3XAQXOpkbJgrUXLM',
-  accessToken: '1563632998863577092-LUjrkMuwwmcelLDTxJJYPTH0KWy3OG',
-  accessSecret: 'k3gFNPISmjF51Sbg8BASo6qc6kUOqbIlkCdwFlHVDSlam',
+  appKey: process.env.TWITTER_API_KEY,
+  appSecret: process.env.TWITTER_API_SECRET,
+  accessToken: process.env.TWITTER_ACCESS_TOKEN,
+  accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
 });
 
 async function testTwitter() {

@@ -10,3 +10,10 @@ secrets.json
 character-with-secrets.json" > .gitignore
 node_modules
 .twitter-verification-cache.json
+
+# Local/server env and exports (never commit)
+oracle-env-setup.sh
+oracle-env-setup.env
+railway-db-export.json
+*.env.local
+.env.*.local
