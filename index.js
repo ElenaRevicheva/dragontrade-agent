@@ -1,4 +1,5 @@
 import * as elizaCore from '@elizaos/core';
+import { checkAndPostTechUpdate } from './x-tech-updater.js';
 import * as twitterPlugin from '@elizaos/plugin-twitter';
 import { TwitterApi } from 'twitter-api-v2';
 import { fileURLToPath } from 'url';
@@ -1702,6 +1703,13 @@ class AuthenticTwitterClient {
       if (process.env.DISABLE_POSTING === '1' || process.env.DISABLE_POSTING === 'true') {
         console.log('⏸️ [DISABLE_POSTING] Posting disabled - skipping (bot stays online)');
         return null;
+      }
+      // CTO AIPA tech milestone — every 5th post, post a real milestone to X
+      if (this.postCount % 5 === 0) {
+        try {
+          const _techPosted = await checkAndPostTechUpdate(this.client, this.postCount);
+          if (_techPosted) return null;
+        } catch (_) { /* safe fallback — never breaks regular posting */ }
       }
       this.postCount++;
       console.log(`\n🎯 [Post #${this.postCount}] Starting authentic content generation...`);
