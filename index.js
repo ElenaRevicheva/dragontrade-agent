@@ -1538,6 +1538,10 @@ class AuthenticTwitterClient {
   }
 
   startQualityReposting() {
+    if (process.env.DISABLE_REPOSTING === '1') {
+      console.log('⏸️ [REPOST] Disabled via DISABLE_REPOSTING=1 (homeTimeline not available on free X tier)');
+      return;
+    }
     console.log('🔄 [REPOST] Starting Quality Repost System...');
     console.log('⏰ [REPOST] Cooldown: 2 hours minimum between reposts');
     console.log('📊 [REPOST] Quality threshold: 50/100 points minimum');
