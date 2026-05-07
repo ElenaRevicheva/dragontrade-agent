@@ -135,7 +135,7 @@ function apiPost(path, data) {
  *     try {
  *       const posted = await checkAndPostTechUpdate(this.client, this.postCount);
  *       if (posted) return null; // used the slot — skip regular content
- *     } catch (_) { /* safe fallback */ }
+ *     } catch (_) { } // safe fallback
  *   }
  */
 async function checkAndPostTechUpdate(twitterClient, postCount = 0) {
