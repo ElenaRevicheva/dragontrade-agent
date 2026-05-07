@@ -259,7 +259,7 @@ Generate ONLY the post text, nothing else:
   return completion.choices?.[0]?.message?.content || '';
 }
 
-// ✨ REFINE DRAFT (Claude - Quality Polish)
+// ✨ REFINE DRAFT (Claude - Quality Polish, Groq fallback on 400/529/503)
 async function refineDraft(draft) {
   const prompt = `
 You are CMO AIPA refining a Twitter/X post for Elena Revicheva.
@@ -278,17 +278,33 @@ Keep emojis if they enhance the message, remove if forced.
 Return ONLY the improved post, nothing else.
 `;
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 150,
-    messages: [{
-      role: "user",
-      content: prompt
-    }]
-  });
-
-  const firstContent = message.content?.[0];
-  return firstContent && firstContent.type === 'text' ? firstContent.text : draft;
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 150,
+      messages: [{ role: "user", content: prompt }]
+    });
+    const firstContent = message.content?.[0];
+    return firstContent && firstContent.type === 'text' ? firstContent.text : draft;
+  } catch (err) {
+    const status = err?.status ?? err?.statusCode;
+    if (status !== 400 && status !== 529 && status !== 503) throw err;
+    console.warn(`[CMO AIPA] Claude refineDraft failed (${status}) — falling back to Groq`);
+    try {
+      const completion = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 150,
+        temperature: 0.3,
+      });
+      const text = completion.choices[0]?.message?.content;
+      console.log('[CMO AIPA] Groq refineDraft fallback succeeded');
+      return typeof text === 'string' && text.trim() ? text.trim() : draft;
+    } catch (groqErr) {
+      console.error('[CMO AIPA] Groq refineDraft also failed:', groqErr.message);
+      return draft;
+    }
+  }
 }
 
 // 🎯 MAIN CONTENT GENERATOR (Bot Integration)
