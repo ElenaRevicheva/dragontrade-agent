@@ -1709,10 +1709,15 @@ class AuthenticTwitterClient {
         return null;
       }
       // CTO AIPA tech milestone — every 5th post, post a real milestone to X
+      // Increment postCount even when a tech update fires so the next slot
+      // is spaced 5 regular posts away (prevents back-to-back milestone dumps).
       if (this.postCount % 5 === 0) {
         try {
           const _techPosted = await checkAndPostTechUpdate(this.client, this.postCount);
-          if (_techPosted) return null;
+          if (_techPosted) {
+            this.postCount++;
+            return null;
+          }
         } catch (_) { /* safe fallback — never breaks regular posting */ }
       }
       this.postCount++;
