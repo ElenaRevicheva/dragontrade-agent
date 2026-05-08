@@ -30,11 +30,11 @@ const X_UPDATES_SECRET = process.env.X_UPDATES_SECRET || '';
 
 /** Hashtag bank — rotate to avoid repetition */
 const HASHTAG_SETS = [
-  '#AI #LangGraph #pgvector #BuildInPublic',
-  '#AIEngineer #RAG #OpenSource #TechFounder',
-  '#LLM #AgentAI #BuildingInPublic #Python',
-  '#AIStartup #LangGraph #VectorDB #Panama',
-  '#AppliedAI #AIAgents #pgvector #Coding',
+  '#AI #BuildInPublic #AIFounder',
+  '#AIAgents #BuildingInPublic #TechFounder',
+  '#LLM #AIStartup #BuildInPublic',
+  '#AIBuilder #Panama #BuildInPublic',
+  '#AppliedAI #AIAgents #TechFounder',
 ];
 
 function pickHashtags(index) {
@@ -42,36 +42,117 @@ function pickHashtags(index) {
 }
 
 /**
- * Format a tech update into a tweet (≤280 chars).
- * Priority: title + punchy hook from description + hashtags + CTA.
+ * Use Claude/Groq to translate a raw commit-style tech update into
+ * a human-readable X post. Falls back to plain formatting on failure.
  */
-function formatTweet(update, hashtagIndex) {
-  const title = (update.title || '').trim();
-  const desc = (update.description || '').trim();
-  const repo = (update.repo || '').replace(/^.*\//, ''); // strip org prefix
+async function generateHumanTweet(update, hashtagIndex) {
+  const rawTitle = (update.title || '').trim();
+  const rawDesc = (update.description || '').trim();
   const tags = pickHashtags(hashtagIndex);
 
-  // Build a punchy one-liner from description (first sentence, max 120 chars)
-  const firstSentence = desc.split(/[.\n]/)[0]?.trim() || desc;
-  const hook = firstSentence.length > 120
-    ? firstSentence.slice(0, 117) + '...'
-    : firstSentence;
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+  const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
-  // Assemble and check length
-  const lines = [
-    `🚀 ${title}`,
-    hook,
-    `→ ${repo}`,
-    tags,
-  ];
-  let tweet = lines.join('\n');
-  if (tweet.length > 275) {
-    // Trim hook further
-    const overflow = tweet.length - 275;
-    const trimmedHook = hook.slice(0, Math.max(30, hook.length - overflow - 3)) + '...';
-    tweet = [`🚀 ${title}`, trimmedHook, `→ ${repo}`, tags].join('\n');
+  const systemPrompt = `You write X (Twitter) posts for Elena Revicheva — AI entrepreneur, builder in Panama.
+She builds AI agents (voice, Kanban, job search, crypto coaching) and shares her journey publicly.
+
+Rules for the post:
+- Explain the FEATURE in plain language — what it does for the USER, not how it was coded
+- Avoid developer jargon: no "NLP-gate", "keyword trigger", "detectTrelloTrigger", "isTask:true", commit prefixes like "feat:", "fix:"
+- Write like a founder sharing an exciting product update — conversational, first-person or product-focused
+- Max 200 characters for the body (hashtags come separately)
+- One emoji max at the start
+- No links, no @ mentions`;
+
+  const userPrompt = `Turn this technical change into a plain-language X post (max 200 chars body):
+
+Feature: "${rawTitle}"
+Detail: "${rawDesc}"
+
+Return ONLY the post body — no hashtags, no quotes, no explanation.`;
+
+  // Try Claude Haiku first (fast + cheap)
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 120,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const body = data?.content?.[0]?.text?.trim() || '';
+        if (body.length > 10) {
+          const tweet = `${body}\n${tags}`;
+          console.log(`[X-Tech] Claude-generated tweet (${tweet.length} chars)`);
+          return tweet.slice(0, 280);
+        }
+      }
+    } catch (e) {
+      console.warn('[X-Tech] Claude tweet gen failed:', e.message);
+    }
   }
+
+  // Groq fallback
+  if (GROQ_API_KEY) {
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 120,
+          temperature: 0.5,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const body = data?.choices?.[0]?.message?.content?.trim() || '';
+        if (body.length > 10) {
+          const tweet = `${body}\n${tags}`;
+          console.log(`[X-Tech] Groq-generated tweet (${tweet.length} chars)`);
+          return tweet.slice(0, 280);
+        }
+      }
+    } catch (e) {
+      console.warn('[X-Tech] Groq tweet gen failed:', e.message);
+    }
+  }
+
+  // Plain fallback — at least strip commit syntax from the title
+  const cleanTitle = rawTitle
+    .replace(/^(feat|fix|docs|chore|refactor|ci|test)[:(]\w*\)?:\s*/i, '')
+    .replace(/\s*[-–—]\s*[\w\s]+$/, '') // strip long trailing clauses
+    .trim();
+  const tweet = `🚀 ${cleanTitle}\n${tags}`;
+  console.log('[X-Tech] Using plain fallback tweet');
   return tweet.slice(0, 280);
+}
+
+/** Keep the sync formatTweet export for tests — now wraps the async generator */
+function formatTweet(update, hashtagIndex) {
+  // Sync fallback only — callers should use generateHumanTweet
+  const title = (update.title || '')
+    .replace(/^(feat|fix|docs|chore|refactor|ci|test)[:(]\w*\)?:\s*/i, '')
+    .trim();
+  const tags = pickHashtags(hashtagIndex);
+  return `🚀 ${title}\n${tags}`.slice(0, 280);
 }
 
 /** Simple HTTP/HTTPS GET that returns parsed JSON or null */
@@ -152,7 +233,7 @@ async function checkAndPostTechUpdate(twitterClient, postCount = 0) {
     }
 
     const update = result.pending[0];
-    const tweet = formatTweet(update, postCount);
+    const tweet = await generateHumanTweet(update, postCount);
 
     console.log(`[X-Tech] Posting tech milestone: ${update.title}`);
     console.log(`[X-Tech] Tweet (${tweet.length} chars):\n${tweet}`);
