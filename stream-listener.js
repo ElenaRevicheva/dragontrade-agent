@@ -78,14 +78,19 @@ export async function startFilteredStream(client, opts = {}) {
   let actionsThisHour = 0;
   setInterval(() => { actionsThisHour = 0; }, 60 * 60 * 1000);
 
+  // Filtered stream + rules require App-Only Bearer token; actions use user client
+  const bearerToken = process.env.TWITTER_BEARER_TOKEN;
+  if (!bearerToken) { console.warn('[Stream] TWITTER_BEARER_TOKEN not set — stream disabled'); return null; }
+  const appClient = new TwitterApi(bearerToken);
+
   try {
     const me = await client.v2.me();
     const myId = me.data?.id;
     if (!myId) { console.warn('[Stream] Cannot get own user ID'); return null; }
 
-    await setupStreamRules(client);
+    await setupStreamRules(appClient);
 
-    const stream = await client.v2.searchStream({
+    const stream = await appClient.v2.searchStream({
       'tweet.fields': ['author_id', 'text', 'created_at', 'public_metrics'],
       'user.fields':  ['name', 'username', 'public_metrics', 'description'],
       'expansions':   ['author_id'],
