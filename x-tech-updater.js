@@ -243,7 +243,8 @@ async function checkAndPostTechUpdate(twitterClient, postCount = 0) {
     // Mark as posted
     await apiPost('/api/x-updates/mark', {
       repo: update.repo,
-      timestamp: update.timestamp,
+      timestamp: update.timestamp || update.received_at || '',
+      title: update.title || '',
     });
 
     console.log(`[X-Tech] ✅ Posted and marked: ${update.title}`);
