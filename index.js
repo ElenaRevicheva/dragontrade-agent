@@ -1,5 +1,7 @@
 import * as elizaCore from '@elizaos/core';
 import { checkAndPostTechUpdate } from './x-tech-updater.js';
+import { startEngagementLoop } from './engagement-bot.js';
+import { startFilteredStream } from './stream-listener.js';
 import * as twitterPlugin from '@elizaos/plugin-twitter';
 import { TwitterApi } from 'twitter-api-v2';
 import { fileURLToPath } from 'url';
@@ -1476,6 +1478,19 @@ class AuthenticTwitterClient {
       this.startAuthenticPosting();
       console.log('🔄 Starting quality reposting...');
       this.startQualityReposting();
+      // Engagement: reply to mentions + auto-follow substantive commenters
+      if (this.client) {
+        startEngagementLoop(this.client, { intervalMinutes: 45, maxReplies: 2, maxFollows: 3 });
+        console.log('💬 Engagement loop started — replies + follows every 45min');
+      }
+      // Filtered stream: monitor "fractional CTO", "AI engineer hiring", etc. in real-time
+      if (this.client) {
+        startFilteredStream(this.client, { autoLike: true, autoFollow: true, maxActionsPerHour: 15 })
+          .then(stream => {
+            if (stream) console.log('🌊 X filtered stream active — monitoring prospects live');
+          })
+          .catch(e => console.warn('[Stream] startup error:', e?.message || e));
+      }
       console.log('✅ Bot fully activated and posting scheduled!');
       return true;
     } catch (error) {
