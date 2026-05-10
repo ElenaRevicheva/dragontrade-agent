@@ -1485,11 +1485,15 @@ class AuthenticTwitterClient {
       }
       // Filtered stream: monitor "fractional CTO", "AI engineer hiring", etc. in real-time
       if (this.client) {
-        startFilteredStream(this.client, { autoLike: true, autoFollow: true, maxActionsPerHour: 15 })
-          .then(stream => {
-            if (stream) console.log('🌊 X filtered stream active — monitoring prospects live');
-          })
-          .catch(e => console.warn('[Stream] startup error:', e?.message || e));
+        (async () => {
+          let connected = false;
+          for (let i = 1; i <= 5 && !connected; i++) {
+            const stream = await startFilteredStream(this.client, { autoLike: true, autoFollow: true, maxActionsPerHour: 15 }).catch(() => null);
+            if (stream) { console.log('🌊 X filtered stream active'); connected = true; break; }
+            if (i < 5) { console.log('[Stream] Attempt ' + i + ' failed — retry in 90s'); await new Promise(r => setTimeout(r, 90000)); }
+          }
+          if (!connected) console.warn('[Stream] Could not connect after 5 attempts');
+        })();
       }
       console.log('✅ Bot fully activated and posting scheduled!');
       return true;
