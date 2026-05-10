@@ -1824,6 +1824,12 @@ class AuthenticTwitterClient {
       // 🧵 NEW: Smart thread handling
       let response;
       if (needsThreading(authenticContent, 280)) {
+        // Stamp date into first line — Twitter blocks exact duplicate content across restarts
+        const _dateStamp = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        if (!authenticContent.includes(_dateStamp)) {
+          const _firstNl = authenticContent.indexOf('\n');
+          authenticContent = _firstNl >= 0 ? authenticContent.slice(0, _firstNl) + " · " + _dateStamp + authenticContent.slice(_firstNl) : authenticContent + " · " + _dateStamp;
+        }
         console.log(`🧵 Content needs threading (${authenticContent.length} chars)`);
         response = await this.postThread(authenticContent);
       } else {
@@ -1960,7 +1966,7 @@ class AuthenticTwitterClient {
       
       // Prepare thread chunks
       const chunks = prepareThread(content, {
-        maxLength: 270, // Leave room for thread indicators
+        maxLength: 250, // Reduced from 270 — Twitter emoji weighted count can exceed JS .length
         indicatorStyle: 'numbers' // Use [1/3], [2/3], [3/3] format
       });
       
@@ -2038,7 +2044,7 @@ class AuthenticTwitterClient {
           }
           
         } catch (error) {
-          console.error(`❌ [THREAD ${position}/${chunks.length}] Failed to post:`, error.message);
+          console.error(`❌ [THREAD ${position}/${chunks.length}] Failed to post:`, error.message, JSON.stringify(error.data || {}));
           
           // Check if it's a rate limit error
           const isRateLimit = error.code === 429 || error.message.includes('429') || error.message.includes('rate limit');
