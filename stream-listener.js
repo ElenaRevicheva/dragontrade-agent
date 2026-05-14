@@ -22,6 +22,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const STATE_FILE = resolve(__dirname, 'stream_state.json');
 
+// ── CRM Hub: push high-intent prospects to HubSpot Client Pipeline ────────────
+async function pushProspectToCRM({ tag, username, name, text, tweetUrl }) {
+  const secret = (process.env.OUTREACH_SECRET || '').trim();
+  const base   = (process.env.CTO_AIPA_WEBHOOK_URL || 'https://webhook.aideazz.xyz/cto').replace(/\/$/, '');
+  if (!secret) return;
+  try {
+    const res = await fetch(`${base}/api/crm-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({
+        source:   'algom_alpha',
+        type:     'prospect',
+        pipeline: 'client',
+        name,
+        context:  `[X/${tag}] @${username}: ${text}\n${tweetUrl}`,
+        urgency:  tag === 'need_cto' ? 5 : tag === 'ai_engineer_hiring' ? 4 : 3,
+      }),
+    });
+    if (res.ok) {
+      console.log(`[Stream] 📊 CRM: prospect @${username} pushed (tag=${tag})`);
+    }
+  } catch (e) {
+    // Non-fatal — don't let CRM failure affect stream
+  }
+}
+
 // ── Stream rules: Elena's ideal client signals ───────────────────────────────
 const STREAM_RULES = [
   { value: '"fractional CTO" -is:retweet lang:en', tag: 'fractional_cto' },
@@ -148,6 +174,18 @@ export async function startFilteredStream(client, opts = {}) {
         }
 
         saveState(state);
+
+        // Push high-intent prospects to HubSpot Client Pipeline via CTO AIPA hub
+        if (highIntent && author?.username) {
+          pushProspectToCRM({
+            tag:      rule?.tag || 'stream',
+            username: author.username,
+            name:     author.name || author.username,
+            text:     text.slice(0, 500),
+            tweetUrl: `https://x.com/${author.username}/status/${tweetId}`,
+          }).catch(() => {});
+        }
+
       } catch (err) {
         console.warn('[Stream] Event error:', err?.message);
       }
