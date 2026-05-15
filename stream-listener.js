@@ -125,6 +125,12 @@ export async function startFilteredStream(client, opts = {}) {
 
     console.log('[Stream] ✅ Connected to X filtered stream — monitoring prospects in real-time');
 
+    let _eventsTotal = 0; let _eventsMatched = 0; let _eventsRejected = 0;
+    setInterval(() => {
+      console.log(`[Stream] 📊 heartbeat — events: ${_eventsTotal} total / ${_eventsMatched} matched / ${_eventsRejected} quality-rejected (last 5min)`);
+      _eventsTotal = 0; _eventsMatched = 0; _eventsRejected = 0;
+    }, 5 * 60 * 1000);
+
     stream.on('data', async (event) => {
       try {
         const tweet = event.data;
@@ -133,6 +139,7 @@ export async function startFilteredStream(client, opts = {}) {
         const text = tweet?.text || '';
         const rule = event.matching_rules?.[0];
         if (!tweetId || tweet?.author_id === myId) return;
+        _eventsTotal++;
 
         const state = loadState();
         if (state.seen.includes(tweetId)) return;
@@ -141,7 +148,8 @@ export async function startFilteredStream(client, opts = {}) {
 
         console.log(`[Stream] 🎯 [${rule?.tag}] @${author?.username}: "${text.slice(0, 90)}"`);
 
-        if (!isQuality(tweet, author)) { saveState(state); return; }
+        if (!isQuality(tweet, author)) { _eventsRejected++; saveState(state); return; }
+        _eventsMatched++;
         if (actionsThisHour >= maxActionsPerHour) { saveState(state); return; }
 
         // Auto-like
