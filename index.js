@@ -31,6 +31,12 @@ process.on('uncaughtException', (err) => {
   setTimeout(() => process.exit(1), 1000);
 });
 process.on('unhandledRejection', (reason, promise) => {
+  const msg = String(reason?.message || reason || '');
+  // mcp-remote SSE timeouts are non-fatal — the module reconnects on its own
+  if (msg.includes('Body Timeout Error') || msg.includes('SseError') || msg.includes('terminated')) {
+    console.warn('[WARN] MCP SSE timeout (non-fatal, ignoring):', msg.slice(0, 120));
+    return;
+  }
   console.error('[FATAL] unhandledRejection:', reason);
   if (reason && typeof reason === 'object' && reason.stack) console.error(reason.stack);
   setTimeout(() => process.exit(1), 1000);
@@ -1484,7 +1490,7 @@ class AuthenticTwitterClient {
         console.log('💬 Engagement loop started — replies + follows every 45min');
       }
       // Filtered stream: monitor "fractional CTO", "AI engineer hiring", etc. in real-time
-      if (this.client) {
+      if (this.client && !process.env.DISABLE_STREAM) {
         (async () => {
           let connected = false;
           for (let i = 1; i <= 5 && !connected; i++) {
@@ -1494,6 +1500,8 @@ class AuthenticTwitterClient {
           }
           if (!connected) console.warn('[Stream] Could not connect after 5 attempts');
         })();
+      } else if (process.env.DISABLE_STREAM) {
+        console.log('🌊 [Stream] Disabled in main process — algom-stream owns the connection');
       }
       console.log('✅ Bot fully activated and posting scheduled!');
       return true;
