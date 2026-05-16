@@ -15,7 +15,7 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 const STATE_FILE = resolve(__dirname, 'stream_state.json');
-const POLL_MS    = 3 * 60 * 1000;
+const POLL_MS    = 30 * 60 * 1000;
 
 const QUERIES = [
   { q: '"fractional CTO" -is:retweet lang:en',                                                tag: 'fractional_cto' },
@@ -28,6 +28,12 @@ const QUERIES = [
 const SPAM_RE       = /follow me|check my bio|dm me|pump|100x|airdrop|nft mint|\$[A-Z]{2,5}\s+moon/i;
 const CRYPTO_RE     = /\$BTC|\$ETH|\$SOL|bitcoin price|ethereum price|altcoin/i;
 const HIGH_INTENT   = /(need|looking for|hiring|seeking|want).*(CTO|AI engineer|fractional)/i;
+
+function extractBioUrl(bio) {
+  if (!bio) return null;
+  var m = bio.match(/https?:\/\/[^\s"'<>]+/);
+  return m ? m[0].replace(/[.,;)]+$/, '') : null;
+}
 
 function loadState() {
   try { if (fs.existsSync(STATE_FILE)) return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch {}
@@ -47,7 +53,7 @@ function isQuality(tweet, author) {
   return true;
 }
 
-async function pushToCRM({ tag, username, name, text, tweetUrl }) {
+async function pushToCRM({ tag, username, name, text, tweetUrl, domain }) {
   const secret = (process.env.OUTREACH_SECRET || '').trim();
   const base   = (process.env.CTO_AIPA_WEBHOOK_URL || 'https://webhook.aideazz.xyz/cto').replace(/\/$/, '');
   if (!secret) return;
@@ -57,6 +63,7 @@ async function pushToCRM({ tag, username, name, text, tweetUrl }) {
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + secret },
       body:    JSON.stringify({
         source:   'algom_poll',
+        domain:   domain || undefined,
         type:     'prospect',
         pipeline: 'client',
         name,
@@ -143,6 +150,7 @@ async function poll(client, myId, actionsRef) {
           name:     (author && author.name) || username,
           text,
           tweetUrl: 'https://x.com/' + username + '/status/' + tweetId,
+          domain:   extractBioUrl(author && author.description),
         }).catch(function() {});
       }
     }
