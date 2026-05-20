@@ -35,6 +35,7 @@ async function pushProspectToCRM({ tag, username, name, text, tweetUrl }) {
         source:   'algom_alpha',
         type:     'prospect',
         pipeline: 'client',
+        sourcePrefix: 'CLIENT-ALGOM',
         name,
         context:  `[X/${tag}] @${username}: ${text}\n${tweetUrl}`,
         urgency:  tag === 'need_cto' ? 5 : tag === 'ai_engineer_hiring' ? 4 : 3,

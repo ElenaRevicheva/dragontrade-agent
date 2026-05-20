@@ -66,6 +66,7 @@ async function pushToCRM({ tag, username, name, text, tweetUrl, domain }) {
         domain:   domain || undefined,
         type:     'prospect',
         pipeline: 'client',
+        sourcePrefix: 'CLIENT-ALGOM',
         name,
         context:  '[X/' + tag + '] @' + username + ': ' + text.slice(0, 400) + '\n' + tweetUrl,
         urgency:  tag === 'need_cto' ? 5 : tag === 'ai_engineer_hiring' ? 4 : 3,
