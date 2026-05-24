@@ -65,3 +65,4 @@ module.exports = {
     }
   ]
 };
+// NOTE: serpapi-jobs is added separately below via pm2 start
