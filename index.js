@@ -19,6 +19,7 @@ import TradingStatsReporter from './educational-bot-integration.js';
 import postLogger from './post-logger.js';
 import { getPostTypeFromCyclePosition, getExchangeFromContent } from './post-tracking-helper.js';
 import { generateAIdeazzContent } from './aideazz-content-generator.js';
+import { generateEducationalWithGrok, isGrokTemporarilyDisabled } from './grok-content.js';
 import { prepareThread, validateThreadChunks, needsThreading } from './twitter-thread-helper.js';
 import { hasRecentVerification, getCachedUserData, saveVerification } from './twitter-verification-cache.js';
 
@@ -45,8 +46,10 @@ process.on('unhandledRejection', (reason, promise) => {
 process.env.ENABLE_ACTION_PROCESSING = 'true';
 process.env.POST_IMMEDIATELY = 'true';
 process.env.MAX_ACTIONS_PROCESSING = '10';
-process.env.POST_INTERVAL_MIN = process.env.POST_INTERVAL_MIN || '3';
-process.env.POST_INTERVAL_MAX = process.env.POST_INTERVAL_MAX || '10';
+// May 25 2026: cadence ~4 posts/day (5-7h between posts).
+// Was 3-10 min — way too aggressive, burned X Dev credits + flooded the timeline.
+process.env.POST_INTERVAL_MIN = process.env.POST_INTERVAL_MIN || '300';
+process.env.POST_INTERVAL_MAX = process.env.POST_INTERVAL_MAX || '420';
 process.env.TWITTER_POLL_INTERVAL = process.env.TWITTER_POLL_INTERVAL || '120';
 process.env.ACTION_TIMELINE_TYPE = 'foryou';
 process.env.TWITTER_SPACES_ENABLE = 'false';
@@ -89,28 +92,31 @@ class CryptoEducationEngine {
     this.lastAPICall = 0;
     this.apiCallInterval = 2000; // 2 seconds between API calls (30 RPM limit)
     
-    // 🚀 CMO AIPA: 20-post optimized cycle (30% paper trading, 30% AIdeazz, 40% educational)
+    // 🆕 May 25 2026 REPOSITIONING: 20-post cycle for AI-augmented building + client attraction.
+    // 50% aideazz (founder identity), 20% client_pitch (services), 15% monetization (real products),
+    // 15% educational/crypto (preserved, no longer dominant). 0% paper_trading (removed — was noise).
+    // Educational posts route to Grok (xAI rhino-sneezing-lemon credits); everything else stays on Claude.
     this.CONTENT_CYCLE = [
-      { type: 'educational' },                             // 1  - Start with value
-      { type: 'aideazz', theme: 'building_in_public' },    // 2  - Show transparency
-      { type: 'paper_trading', exchange: 'bybit' },        // 3  ← Paper trading
-      { type: 'educational' },                             // 4  - More education
-      { type: 'aideazz', theme: 'founder_journey' },       // 5  - Personal story
-      { type: 'educational' },                             // 6  - Risk management
-      { type: 'paper_trading', exchange: 'binance' },      // 7  ← Paper trading
-      { type: 'educational' },                             // 8  - Technical analysis
-      { type: 'aideazz', theme: 'product_demo' },          // 9  - Show products
-      { type: 'educational' },                             // 10 - Trading psychology
-      { type: 'paper_trading', exchange: 'both' },         // 11 ← Paper trading
-      { type: 'educational' },                             // 12 - Strategy knowledge
-      { type: 'aideazz', theme: 'vibe_coding' },           // 13 - Development speed
-      { type: 'educational' },                             // 14 - Order mechanics
-      { type: 'paper_trading', exchange: 'bybit' },        // 15 ← Paper trading
-      { type: 'aideazz', theme: 'metrics_update' },        // 16 - Traction numbers
-      { type: 'educational' },                             // 17 - Scam alerts
-      { type: 'paper_trading', exchange: 'binance' },      // 18 ← Paper trading
-      { type: 'aideazz', theme: 'behind_scenes' },         // 19 - Raw founder life
-      { type: 'paper_trading', exchange: 'both' }          // 20 ← Paper trading
+      { type: 'aideazz',       theme: 'building_in_public' },       // 1  open with builder identity
+      { type: 'client_pitch',  theme: 'fractional_cto' },           // 2  what you offer + who for
+      { type: 'educational' },                                       // 3  crypto education (Grok)
+      { type: 'aideazz',       theme: 'vibe_coding' },               // 4  "built in N hours with Claude"
+      { type: 'monetization',  theme: 'espaluz' },                   // 5  real product, real paid users
+      { type: 'aideazz',       theme: 'founder_journey' },           // 6  solo single-mom builder story
+      { type: 'client_pitch',  theme: 'ai_marketing' },              // 7  marketing engine for clients
+      { type: 'aideazz',       theme: 'metrics_update' },            // 8  honest numbers
+      { type: 'educational' },                                       // 9  crypto education (Grok)
+      { type: 'aideazz',       theme: 'product_demo' },              // 10 product demo
+      { type: 'client_pitch',  theme: 'hubspot_orchestration' },     // 11 multi-agent CRM dashboard
+      { type: 'aideazz',       theme: 'behind_scenes' },             // 12 raw founder life
+      { type: 'monetization',  theme: 'vjh_lead_mode' },             // 13 honest job-hunt LEAD mode
+      { type: 'aideazz',       theme: 'vibe_coding' },               // 14 more velocity proof
+      { type: 'educational' },                                       // 15 crypto education (Grok)
+      { type: 'aideazz',       theme: 'building_in_public' },        // 16 transparency
+      { type: 'client_pitch',  theme: 'algom_alpha_lessons' },       // 17 lessons from running this agent
+      { type: 'aideazz',       theme: 'founder_journey' },           // 18 story
+      { type: 'monetization',  theme: 'aideazz_blog' },              // 19 blog SEO/AEO as case study
+      { type: 'aideazz',       theme: 'metrics_update' }             // 20 closing numbers
     ];
   }
 
@@ -1794,24 +1800,40 @@ class AuthenticTwitterClient {
           break;
           
         case 'aideazz':
-          // 🚀 NEW: AIdeazz marketing content
-          console.log(`🚀 [AIDEAZZ] Generating ${contentConfig.theme} content...`);
+        case 'client_pitch':
+        case 'monetization':
+          // May 25 2026: all three brand/client/monetization types route through
+          // generateAIdeazzContent (Claude). postType drives prompt selection inside.
+          console.log(`🚀 [${contentConfig.type.toUpperCase()}] Generating ${contentConfig.theme} content via Claude...`);
           try {
-            const aideazzResult = await generateAIdeazzContent(contentConfig.theme);
+            const aideazzResult = await generateAIdeazzContent(contentConfig.theme, contentConfig.type);
             authenticContent = aideazzResult.content;
           } catch (error) {
-            console.error('❌ AIdeazz generation error:', error.message);
-            // Fallback to educational
+            console.error(`❌ ${contentConfig.type} generation error:`, error.message);
+            // Fallback to educational (CMC engine, original path)
             const realMarketData = await this.cmcEngine.getCMCData();
             authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
           }
           break;
-          
+
         case 'educational':
         default:
-          // ✅ PRESERVED: Original educational content logic
-          // This includes: TA, risk management, psychology, strategies, order mechanics, scam alerts, sentiment
-          console.log(`📚 [EDUCATIONAL] Generating comprehensive trading education...`);
+          // May 25 2026: educational posts try Grok first (uses xAI rhino-sneezing-lemon
+          // credits, plus Grok has X-realtime grounding for topical posts).
+          // On Grok failure, fall back to original CMC engine path (Claude/Anthropic).
+          console.log(`📚 [EDUCATIONAL] Generating crypto education...`);
+          if (!isGrokTemporarilyDisabled()) {
+            try {
+              authenticContent = await generateEducationalWithGrok();
+              console.log('   ✅ Generated via Grok (xAI)');
+              break;
+            } catch (grokErr) {
+              console.warn(`   ⚠️ Grok failed (${grokErr.message}) — falling back to CMC/Claude`);
+              // fall through to legacy path
+            }
+          } else {
+            console.log('   ℹ️ Grok temporarily disabled (consecutive failures) — using CMC/Claude');
+          }
           const realMarketData = await this.cmcEngine.getCMCData();
           authenticContent = await this.cmcEngine.generateRealInsight(realMarketData);
           break;

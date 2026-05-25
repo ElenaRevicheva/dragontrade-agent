@@ -200,7 +200,87 @@ const CORE_MESSAGES = [
 ];
 
 // 📝 GENERATE DRAFT (Groq - Fast & Free)
-async function generateDraft(themeId) {
+// ============================================================================
+// May 25 2026: NEW theme libraries for client-attraction + monetization posts.
+// These extend the original `aideazz` theme set without modifying it.
+// Routing in index.js sends client_pitch.* and monetization.* themes here.
+// ============================================================================
+
+const CLIENT_PITCH_THEMES = {
+  fractional_cto: `Position: fractional CTO services for early-stage founders.
+What I offer: AI architecture review, agent orchestration design, model routing strategy, eval harness setup. Daily rate or weekly retainer.
+Proof: 10 production agents shipped solo in 12 months. 131-test eval harness with Claude as judge.
+Audience pain: "I want to ship AI features but I have no senior eng to design the system."
+Voice: direct, honest about what AI-augmented building actually looks like.`,
+
+  ai_marketing: `Position: AI marketing infrastructure for founders who want to ship content + SEO/AEO without a marketing team.
+What I built: daily blog publisher (Claude-generated, FAQPage JSON-LD, AEO score 9/10), HubSpot multi-agent dashboard, Trello current-month board sync.
+Audience pain: "My blog has zero SEO traffic and I'm not on Perplexity / Google AI Overview."
+Proof: blog AEO score moved 4/10 → 9/10 in 30 minutes by extracting FAQ JSON-LD from existing content.`,
+
+  hubspot_orchestration: `Position: multi-agent CRM orchestration.
+What I built: [STREAM-AGENT] dealname prefix convention so a single HubSpot pipeline shows what each AI agent contributed at a glance. response_detector → HubSpot stage updates. HubSpot → Trello current-month bridge.
+Audience pain: "I have 5 different AI agents producing leads and zero visibility into which one actually closes."
+Proof: 269 deals tagged across 5 agents, single dashboard.`,
+
+  algom_alpha_lessons: `Position: what running a fully-autonomous social media agent for 7 months actually teaches you.
+Lessons earned: rate-limit theater vs real demand, the difference between detection and action, the cost of LLM hallucinations in operator-facing copy.
+Audience: founders curious about agent autonomy vs human-in-loop.
+Voice: skeptical practitioner, never founder-evangelism.`,
+};
+
+const MONETIZATION_THEMES = {
+  espaluz: `Position: EspaLuz — AI Spanish tutor for English-speaking families with kids in Panamanian schools.
+Real metrics: paid users on WhatsApp + Telegram. PayPal subscription. Trial → paid funnel.
+Audience: parents who moved abroad and need their kids to keep up at school.
+Voice: warm but practical, this is a real product solving a real problem.`,
+
+  vjh_lead_mode: `Position: VibeJobHunter in honest LEAD mode.
+What it is: the job-hunt agent surfaces curated roles to my Telegram for manual review, instead of pretending to auto-submit. After I caught the previous version simulating-not-applying for 6 months (707 fake records, 0 real submissions), I rebuilt it honestly in 3 hours.
+Audience: AI builders wrestling with the autonomy-vs-honesty trade-off.
+Voice: the "I treat my own infrastructure with skepticism" stance.`,
+
+  aideazz_blog: `Position: aideazz.xyz blog as a fully-autonomous content + SEO + AEO infrastructure.
+What runs: daily blog publisher → per-article static HTML on 4everland IPFS → BlogPosting + FAQPage JSON-LD → sitemap auto-update → Dev.to cross-post.
+Real outcome: per-URL unique content for Google, structured Q&A for Perplexity / Google AI Overview.
+Audience: founders who want SEO/AEO without a content team.`,
+};
+
+function getThemePrompt(themeId, postType) {
+  if (postType === 'client_pitch' && CLIENT_PITCH_THEMES[themeId]) {
+    return CLIENT_PITCH_THEMES[themeId];
+  }
+  if (postType === 'monetization' && MONETIZATION_THEMES[themeId]) {
+    return MONETIZATION_THEMES[themeId];
+  }
+  return null; // not a new theme — caller falls back to existing aideazz logic
+}
+
+async function generateDraft(themeId, postType = 'aideazz') {
+  // May 25 2026: route new postTypes (client_pitch, monetization) through dedicated prompts.
+  const _newThemePrompt = getThemePrompt(themeId, postType);
+  if (_newThemePrompt) {
+    const _sys = `You are Elena Revicheva (@reviceva), AI builder and fractional CTO.
+You write SHORT (under 270 chars, fits one tweet), HONEST, SPECIFIC posts.
+No hype, no "🚀 incredible", no generic founder-speak. Concrete proof + specific audience.
+Max 1-2 emojis. Max 2 hashtags. Never use #BuildInPublic alone — pair with a niche tag.
+Always close with either: (a) a specific number, (b) a real outcome, or (c) a direct CTA.`;
+    const _user = `${_newThemePrompt}
+
+Write the tweet now. Output ONLY the tweet text — no preamble, no quotes, no markdown.`;
+    try {
+      const _message = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 300,
+        messages: [{ role: 'user', content: `${_sys}\n\n${_user}` }],
+      });
+      return _message.content[0].text.trim();
+    } catch (e) {
+      console.error('[aideazz-gen] client_pitch/monetization prompt failed:', e.message);
+      // fall through to legacy path so we always return something
+    }
+  }
+
   // Get day-specific theme
   const today = new Date().getDay();
   const dailyTheme = DAILY_THEMES[today];
@@ -308,7 +388,7 @@ Return ONLY the improved post, nothing else.
 }
 
 // 🎯 MAIN CONTENT GENERATOR (Bot Integration)
-export async function generateAIdeazzContent(themeId) {
+export async function generateAIdeazzContent(themeId, postType = 'aideazz') {
   try {
     // Get today's theme for context
     const today = new Date().getDay();
@@ -318,7 +398,7 @@ export async function generateAIdeazzContent(themeId) {
     console.log(`📚 Pillar: ${dailyTheme.pillar}`);
 
     // Generate draft with Groq (fast, free)
-    const draft = await generateDraft(themeId);
+    const draft = await generateDraft(themeId, postType);
     console.log(`📝 Draft generated (${draft.length} chars)`);
 
     // Refine with Claude (quality)
