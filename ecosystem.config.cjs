@@ -33,6 +33,7 @@ module.exports = {
       watch: false,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
+    /* MAY 25 2026 DISABLED — orphan paper trading bots; new 20-post cycle is 0% paper_trading. Re-enable by uncommenting if paper trading returns to the cycle.
     {
       name: 'dragontrade-bybit',
       script: 'production-paper-bot-professional.js',
@@ -42,7 +43,8 @@ module.exports = {
       max_restarts: 10,
       watch: false,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
-    },
+    }, */
+    /* MAY 25 2026 DISABLED — orphan paper trading bots; new 20-post cycle is 0% paper_trading. Re-enable by uncommenting if paper trading returns to the cycle.
     {
       name: 'dragontrade-binance',
       script: 'production-paper-bot-professional.js',
@@ -52,7 +54,7 @@ module.exports = {
       max_restarts: 10,
       watch: false,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
-    },
+    }, */
     {
       name: 'dragontrade-dashboard',
       script: 'dashboard-server.js',
