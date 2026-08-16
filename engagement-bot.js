@@ -210,6 +210,13 @@ export async function runEngagementCycle(twitterClient, options = {}) {
     } else {
       console.warn('[Engagement] Cycle error:', msg.slice(0, 200));
     }
+    // Page Elena on anything that will not fix itself. This loop ran every 45
+    // minutes from late May to 16 August logging "credits depleted" and nothing
+    // else — a warn() nobody reads is not an alert.
+    try {
+      const { alertPostingFailure } = await import('./alerts.mjs');
+      await alertPostingFailure('X engagement cycle', err);
+    } catch { /* alerting must never take down the loop it watches */ }
   }
 
   state.lastRunAt = now.toISOString();

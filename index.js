@@ -2075,7 +2075,14 @@ class AuthenticTwitterClient {
           
         } catch (error) {
           console.error(`❌ [THREAD ${position}/${chunks.length}] Failed to post:`, error.message, JSON.stringify(error.data || {}));
-          
+
+          // Page Elena. A 402 here is what silenced this account from 13 June to
+          // 16 August; the alert module dedupes so this cannot become spam.
+          try {
+            const { alertPostingFailure } = await import('./alerts.mjs');
+            await alertPostingFailure(`X thread post ${position}/${chunks.length}`, error);
+          } catch { /* alerting must never take down posting */ }
+
           // Check if it's a rate limit error
           const isRateLimit = error.code === 429 || error.message.includes('429') || error.message.includes('rate limit');
           

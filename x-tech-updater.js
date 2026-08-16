@@ -239,9 +239,22 @@ async function checkAndPostTechUpdate(twitterClient, postCount = 0) {
     });
 
     console.log(`[X-Tech] ✅ Posted and marked: ${update.title}`);
+    // Posting works again — clear the alert so the NEXT outage pages immediately
+    // instead of sitting inside a stale cooldown.
+    try {
+      const { alertRecovered } = await import('./alerts.mjs');
+      alertRecovered('x-credits');
+    } catch { /* never let bookkeeping break a successful post */ }
     return true;
   } catch (err) {
     console.error(`[X-Tech] ⚠️ Error posting tech update: ${err.message}`);
+    // Tell Elena. This returns false and "the bot continues normally", which is
+    // exactly how 1,552 failures between 13 June and 16 August went unnoticed:
+    // continuing normally while posting nothing looks identical to a quiet week.
+    try {
+      const { alertPostingFailure } = await import('./alerts.mjs');
+      await alertPostingFailure('X tech update', err);
+    } catch { /* alerting must never take down the bot it watches */ }
     return false; // SAFE FALLBACK — bot continues normally
   }
 }
