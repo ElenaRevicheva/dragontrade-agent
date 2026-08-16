@@ -329,14 +329,18 @@ Examples of Elena's voice:
 Generate ONLY the post text, nothing else:
 `;
 
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.8,
-    max_tokens: 100
-  });
-
-  return completion.choices?.[0]?.message?.content || '';
+  // Five providers, not one (Aug 16 2026) — see llm-chain.mjs. Was a hard-wired
+  // Groq call at max_tokens 100; Groq retired llama-3.3-70b that day and its
+  // reasoning replacements return EMPTY below ~800 on a creative prompt like
+  // this one. Returning '' here silently produces no post.
+  const { complete, TWEET_TOKENS } = await import('./llm-chain.mjs');
+  const { text, errors, provider } = await complete(prompt, { maxTokens: TWEET_TOKENS });
+  if (text) {
+    if (errors.length) console.log(`[content-gen] draft via ${provider} after ${errors.length} failure(s)`);
+    return text;
+  }
+  console.warn(`[content-gen] all providers failed: ${errors.join('; ').slice(0, 200)}`);
+  return '';
 }
 
 // ✨ REFINE DRAFT (Claude - Quality Polish, Groq fallback on 400/529/503)
@@ -367,21 +371,25 @@ Return ONLY the improved post, nothing else.
     const firstContent = message.content?.[0];
     return firstContent && firstContent.type === 'text' ? firstContent.text : draft;
   } catch (err) {
-    const status = err?.status ?? err?.statusCode;
-    if (status !== 400 && status !== 529 && status !== 503) throw err;
-    console.warn(`[CMO AIPA] Claude refineDraft failed (${status}) — falling back to Groq`);
+    // Fall back on ANY Claude failure, not just three status codes.
+    //
+    // This used to rethrow unless the status was 400/529/503, so a rotated key
+    // (401), a 403 or a network blip escaped to the caller while four other
+    // providers sat unused. And the fallback itself was Groq alone, at 150
+    // tokens — below the ~800 its reasoning replacements need to write anything.
+    const status = err?.status ?? err?.statusCode ?? '?';
+    console.warn(`[CMO AIPA] Claude refineDraft failed (${status}) — falling back to the chain`);
     try {
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150,
-        temperature: 0.3,
-      });
-      const text = completion.choices[0]?.message?.content;
-      console.log('[CMO AIPA] Groq refineDraft fallback succeeded');
-      return typeof text === 'string' && text.trim() ? text.trim() : draft;
-    } catch (groqErr) {
-      console.error('[CMO AIPA] Groq refineDraft also failed:', groqErr.message);
+      const { complete, TWEET_TOKENS } = await import('./llm-chain.mjs');
+      const { text, errors, provider } = await complete(prompt, { maxTokens: TWEET_TOKENS });
+      if (text) {
+        console.log(`[CMO AIPA] refineDraft recovered via ${provider}`);
+        return text;
+      }
+      console.error(`[CMO AIPA] all providers failed: ${errors.join('; ').slice(0, 200)}`);
+      return draft;
+    } catch (chainErr) {
+      console.error('[CMO AIPA] refineDraft chain threw:', chainErr.message);
       return draft;
     }
   }

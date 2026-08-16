@@ -56,38 +56,25 @@ Rules:
 
 Reply ONLY the tweet text, nothing else.`;
 
-  return new Promise((resolve) => {
-    const body = JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 80,
-      temperature: 0.7,
-    });
-    const req = https.request({
-      hostname: 'api.groq.com',
-      path: '/openai/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Length': Buffer.byteLength(body),
-      },
-    }, (res) => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          const text = json.choices?.[0]?.message?.content?.trim() || null;
-          resolve(text);
-        } catch { resolve(null); }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.setTimeout(10000, () => { req.destroy(); resolve(null); });
-    req.write(body);
-    req.end();
-  });
+  // Five providers, not one (Aug 16 2026) — see llm-chain.mjs.
+  //
+  // This was a single hard-wired Groq call at max_tokens 80. Groq retired
+  // llama-3.3-70b that day and its replacements are REASONING models: measured
+  // on this repo's own prompts, gpt-oss-120b returns EMPTY at 300 tokens and
+  // needs ~800 before it writes a complete short post. At 80 it would have
+  // returned nothing on every call — and this function returns null on failure,
+  // which the caller treats as "no reply worth sending", so the bot would have
+  // gone quiet with nothing in the logs to explain it.
+  //
+  // Contract unchanged: still returns the reply text, or null.
+  const { complete, TWEET_TOKENS } = await import('./llm-chain.mjs');
+  const { text, errors, provider } = await complete(prompt, { maxTokens: TWEET_TOKENS });
+  if (text) {
+    if (errors.length) console.log(`[engagement] reply via ${provider} after ${errors.length} failure(s)`);
+    return text;
+  }
+  console.warn(`[engagement] all providers failed: ${errors.join('; ').slice(0, 200)}`);
+  return null;
 }
 
 const SPAM_PATTERNS = [

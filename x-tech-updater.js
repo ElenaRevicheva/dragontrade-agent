@@ -103,35 +103,26 @@ Return ONLY the post body — no hashtags, no quotes, no explanation.`;
   }
 
   // Groq fallback
-  if (GROQ_API_KEY) {
+  {
+    // Five providers, not one (Aug 16 2026) — see llm-chain.mjs. Was a hard-wired
+    // Groq call at max_tokens 120; Groq retired llama-3.3-70b that day and its
+    // reasoning replacements need ~800 on a prompt like this. Below that they
+    // return '', body.length > 10 is false, and the function silently drops to
+    // the canned tweet below — a quiet quality regression nobody would notice.
     try {
-      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 120,
-          temperature: 0.5,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-        }),
+      const { complete, TWEET_TOKENS } = await import('./llm-chain.mjs');
+      const { text, errors, provider } = await complete(userPrompt, {
+        system: systemPrompt,
+        maxTokens: TWEET_TOKENS,
       });
-      if (resp.ok) {
-        const data = await resp.json();
-        const body = data?.choices?.[0]?.message?.content?.trim() || '';
-        if (body.length > 10) {
-          const tweet = `${body}\n${tags}`;
-          console.log(`[X-Tech] Groq-generated tweet (${tweet.length} chars)`);
-          return tweet.slice(0, 280);
-        }
+      if (text && text.length > 10) {
+        const tweet = `${text}\n${tags}`;
+        console.log(`[X-Tech] ${provider}-generated tweet (${tweet.length} chars)`);
+        return tweet.slice(0, 280);
       }
+      if (errors.length) console.warn(`[X-Tech] all providers failed: ${errors.join('; ').slice(0, 180)}`);
     } catch (e) {
-      console.warn('[X-Tech] Groq tweet gen failed:', e.message);
+      console.warn('[X-Tech] tweet gen chain failed:', e.message);
     }
   }
 
