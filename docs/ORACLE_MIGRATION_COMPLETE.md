@@ -72,7 +72,7 @@
 - **External Access**: âœ… Enabled (for Railway bots)
 
 ### Database Migration
-- **Source**: Railway PostgreSQL (shinkansen.proxy.rlwy.net:42508)
+- **Source**: Railway PostgreSQL (<railway-proxy-host>:<port>)
 - **Destination**: Oracle PostgreSQL (170.9.242.90:5432)
 - **Data Migrated**:
   - 	rading_stats: 2 rows (Bybit + Binance stats)
