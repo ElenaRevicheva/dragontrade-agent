@@ -1,6 +1,9 @@
 const {Client} = require('pg');
+// Reads DATABASE_URL, exactly as db-config.js does for the running agent. On Oracle that
+// variable is already set — it is what PM2 starts the app with — so this diagnostic
+// behaves identically there, without a credential living in the file.
 const c = new Client({
-    connectionString: 'postgresql://dragontrade:dragontrade_secure_2026@localhost:5432/dragontrade'
+    connectionString: process.env.DATABASE_URL
 });
 
 c.connect()

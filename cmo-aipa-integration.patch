@@ -1,9 +1,9 @@
 From 44167af70930b41ec246ae075fbd01c04ec40bf4 Mon Sep 17 00:00:00 2001
-From: Cursor Agent <cursoragent@cursor.com>
+From: Cursor Agent <cursoragent@users.noreply.github.com>
 Date: Tue, 18 Nov 2025 20:36:06 +0000
 Subject: [PATCH] Changes made by Agent
 
-Co-authored-by: elena.revicheva2016 <elena.revicheva2016@gmail.com>
+Co-authored-by: Elena Revicheva <ElenaRevicheva@users.noreply.github.com>
 ---
  IMPLEMENTATION_COMPLETE_CMO_AIPA.md | 327 ++++++++++++++++++++++++++++
  1 file changed, 327 insertions(+)
