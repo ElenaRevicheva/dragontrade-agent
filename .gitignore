@@ -17,3 +17,6 @@ oracle-env-setup.env
 railway-db-export.json
 *.env.local
 .env.*.local
+
+# dev artifacts — kept on disk, never shipped
+*.patch
