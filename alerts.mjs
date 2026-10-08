@@ -28,7 +28,9 @@ import fs from 'fs';
 import path from 'path';
 
 const STATE_PATH = path.join(process.cwd(), 'data', 'alert-state.json');
-const ALERT_COOLDOWN_H = Number(process.env.ALERT_COOLDOWN_H || 12);
+// Read when an alert fires, not at import: index.js imports this module BEFORE it calls dotenv.config(),
+// so a module-level read always saw the default and ALERT_COOLDOWN_H in .env was silently ignored (7 Oct 2026).
+const alertCooldownH = () => Number(process.env.ALERT_COOLDOWN_H || 12);
 
 function readState() {
   try {
@@ -109,7 +111,7 @@ export async function alertPostingFailure(context, err) {
       lastAlertAt: state[key]?.lastAlertAt,
     };
 
-    if (last && sinceH < ALERT_COOLDOWN_H) {
+    if (last && sinceH < alertCooldownH()) {
       writeState(state); // count it, stay quiet
       return false;
     }
