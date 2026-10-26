@@ -49,7 +49,8 @@ const MIN_TOKENS = 300;
  */
 export const TWEET_TOKENS = 800;
 
-export const PROFILE_BULK = ['gemini', 'groq', 'openai', 'grok', 'claude'];
+// 26 Oct 2026 order rule (Elena): all five wired; free first (Gemini, Groq), then Grok, then OpenAI, Claude last.
+export const PROFILE_BULK = ['gemini', 'groq', 'grok', 'openai', 'claude'];
 
 export const PROVIDER_KEYS = {
   gemini: 'GEMINI_API_KEY',
