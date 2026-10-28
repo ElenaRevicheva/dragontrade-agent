@@ -15,7 +15,10 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 const STATE_FILE = resolve(__dirname, 'stream_state.json');
-const POLL_MS    = 30 * 60 * 1000;
+// Cadence is a cost dial under X pay-per-use: 5 queries x 10 posts x (1440/ALGOM_POLL_MINUTES)
+// reads a day at $0.005 each. Default unchanged (30 min); set ALGOM_POLL_MINUTES in .env to change it.
+const POLL_MINUTES = parseInt(process.env.ALGOM_POLL_MINUTES, 10) || 30;
+const POLL_MS    = POLL_MINUTES * 60 * 1000;
 
 const QUERIES = [
   { q: '"fractional CTO" -is:retweet lang:en',                                                tag: 'fractional_cto' },
@@ -179,7 +182,7 @@ async function main() {
   var myId   = me.data && me.data.id;
   if (!myId) { console.error('[Poll] Cannot get own user ID'); process.exit(1); }
 
-  console.log('[Poll] Started as @' + me.data.username + ' — polling 5 keyword sets every 3min');
+  console.log('[Poll] Started as @' + me.data.username + ' — polling 5 keyword sets every ' + POLL_MINUTES + ' min');
 
   var actionsRef = { count: 0 };
   setInterval(function() { actionsRef.count = 0; }, 60 * 60 * 1000);

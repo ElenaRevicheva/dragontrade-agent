@@ -97,6 +97,11 @@ function isSubstantive(text) {
   return cleaned.length >= 8;
 }
 
+// Own user id never changes: look it up once per process, not every 45 minutes.
+// Under X pay-per-use (28 Oct 2026) every GET /2/users/me is a billed user lookup —
+// 32 cycles a day of a constant is money for nothing.
+let cachedMyId = null;
+
 export async function runEngagementCycle(twitterClient, options = {}) {
   const { groqApiKey = process.env.GROQ_API_KEY, maxReplies = 2, maxFollows = 3 } = options;
 
@@ -120,8 +125,11 @@ export async function runEngagementCycle(twitterClient, options = {}) {
   let followsDone = 0;
 
   try {
-    const me = await twitterClient.v2.me();
-    const myId = me.data?.id;
+    if (!cachedMyId) {
+      const me = await twitterClient.v2.me();
+      cachedMyId = me.data?.id || null;
+    }
+    const myId = cachedMyId;
     if (!myId) { console.log('[Engagement] Could not get own user ID'); return; }
 
     const mentions = await twitterClient.v2.userMentionTimeline(myId, {
