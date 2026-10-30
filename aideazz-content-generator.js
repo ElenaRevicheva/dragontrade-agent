@@ -269,7 +269,8 @@ Always close with either: (a) a specific number, (b) a real outcome, or (c) a di
 
 Write the tweet now. Output ONLY the tweet text — no preamble, no quotes, no markdown.`;
     try {
-      const _message = await anthropic.messages.create({
+      if ((await import('./llm-chain.mjs')).freeTier()) throw new Error('MODEL_TIER=free'); // 30 Oct 2026: Claude not first
+      const _message = await anthropic.messages.create({ // tier-gated
         model: process.env.CLAUDE_SONNET_MODEL || "claude-sonnet-4-6",
         max_tokens: 300,
         messages: [{ role: 'user', content: `${_sys}\n\n${_user}` }],
@@ -363,7 +364,8 @@ Return ONLY the improved post, nothing else.
 `;
 
   try {
-    const message = await anthropic.messages.create({
+    if ((await import('./llm-chain.mjs')).freeTier()) throw new Error('MODEL_TIER=free'); // 30 Oct 2026: Claude not first
+    const message = await anthropic.messages.create({ // tier-gated
       model: process.env.CLAUDE_SONNET_MODEL || "claude-sonnet-4-6",
       max_tokens: 150,
       messages: [{ role: "user", content: prompt }]

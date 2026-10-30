@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /**
  * Provider fallback chain for dragontrade / Algom Alpha.
  *
@@ -51,6 +52,16 @@ export const TWEET_TOKENS = 800;
 
 // 26 Oct 2026 order rule (Elena): all five wired; free first (Gemini, Groq), then Grok, then OpenAI, Claude last.
 export const PROFILE_BULK = ['gemini', 'groq', 'grok', 'openai', 'claude'];
+
+// 30 Oct 2026: true while MODEL_TIER=free (written into .env by cto-aipa scripts/model-tier.cjs from Elena's
+// Anthropic billing mail). Read from the file on every call, so a top-up takes effect without a restart.
+export function freeTier() {
+  try {
+    const m = readFileSync(new URL('./.env', import.meta.url), 'utf8').match(/^MODEL_TIER=(\w+)/m);
+    if (m) return m[1] === 'free';
+  } catch { /* no .env: the process env decides */ }
+  return (process.env.MODEL_TIER || '') === 'free';
+}
 
 export const PROVIDER_KEYS = {
   gemini: 'GEMINI_API_KEY',
